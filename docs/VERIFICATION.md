@@ -71,6 +71,10 @@ The fork is [ammartaha/my-trakt-wallpapers](https://github.com/ammartaha/my-trak
 
 Release signing secrets are configured. Pushes run checks and builds; version tags also publish the tested signed APK. The workflow can also publish when run manually on a version tag. Pull requests cannot receive signing secrets. See [Actions](https://github.com/ammartaha/my-trakt-wallpapers/actions).
 
+[The release run](https://github.com/ammartaha/my-trakt-wallpapers/actions/runs/39744425386) passed and published [version 1.0.0](https://github.com/ammartaha/my-trakt-wallpapers/releases/tag/v1.0.0). The APK can be downloaded directly, without extracting an Actions artifact. Its SHA-256 is `42d461b6388cea101e4293b2240859ad2a801d9cece19c9a1852a61beccbcbb4`.
+
+Both recorded runs were started through `workflow_dispatch`. Push and pull-request triggers are configured. An automatic push run has not yet been observed on this new fork.
+
 ## Reports and preview
 
 - Unit report: `sample/build/reports/tests/testDebugUnitTest/index.html`.
