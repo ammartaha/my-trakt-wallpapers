@@ -19,6 +19,7 @@ import com.traktlistbackdrops.tv.R
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.withLock
 import tv.projectivy.plugin.wallpaperprovider.sample.local.*
+import java.net.URI
 
 class SettingsFragment : GuidedStepSupportFragment(), SharedPreferences.OnSharedPreferenceChangeListener {
     private val scope = MainScope()
@@ -206,18 +207,18 @@ class SettingsFragment : GuidedStepSupportFragment(), SharedPreferences.OnShared
             }
         }
         val clientId = field("Trakt client ID (no client secret)", PreferencesManager.traktClientId)
-        val redirect = field("Registered Trakt HTTPS redirect URI", PreferencesManager.traktRedirectUri)
+        val redirect = field("Registered Trakt redirect URI", PreferencesManager.traktRedirectUri)
         val tmdbKey = field("TMDB v3 API key", PreferencesManager.tmdbApiKey, true)
         val dialog = AlertDialog.Builder(requireContext()).setTitle("API settings").setView(container)
             .setNegativeButton("Cancel", null).setPositiveButton("Save", null).create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val id = clientId.text.toString().trim()
-                val uri = redirect.text.toString().trim()
+                val uri = redirect.text.toString()
                 val key = tmdbKey.text.toString().trim()
                 when {
                     id.isBlank() -> clientId.error = "Enter the Trakt client ID."
-                    !uri.startsWith("https://") -> redirect.error = "Use the same HTTPS address as your Trakt API app."
+                    !isValidTraktRedirectUri(uri) -> redirect.error = "Use the registered HTTPS URI or an HTTP URI on localhost, 127.0.0.1, or [::1]."
                     key.isBlank() && PreferencesManager.tmdbApiKey.isBlank() -> tmdbKey.error = "Enter the TMDB v3 API key."
                     else -> runUi {
                         if (id != PreferencesManager.traktClientId || uri != PreferencesManager.traktRedirectUri) disconnect()
@@ -260,6 +261,7 @@ class SettingsFragment : GuidedStepSupportFragment(), SharedPreferences.OnShared
         }, LinearLayout.LayoutParams(210, 90))
         box.addView(TextView(requireContext()).apply {
             text = "My Trakt Wallpapers\n\nBased on johnneerdael/traktlistbackdrops and the Projectivy plugin sample. Apache License 2.0.\n\n" +
+                "My Trakt Wallpapers uses Trakt but is not endorsed or certified by Trakt.\n\n" +
                 "This product uses the TMDB API but is not endorsed or certified by TMDB.\nhttps://www.themoviedb.org\n\n" +
                 "Trakt provides your chosen lists. TMDB provides artwork and details. Login tokens and API keys are encrypted on this TV. " +
                 "Only official Trakt and TMDB services receive API requests. No analytics, external server, or hosting is used. " +
@@ -288,6 +290,15 @@ class SettingsFragment : GuidedStepSupportFragment(), SharedPreferences.OnShared
     private fun intervalTitle(value: Int) = when (value) { 15 -> "15 minutes"; 360 -> "6 hours"; else -> "1 hour" }
 
     companion object {
+        internal fun isValidTraktRedirectUri(value: String): Boolean {
+            val uri = runCatching { URI(value).parseServerAuthority() }.getOrNull() ?: return false
+            if (uri.host.isNullOrBlank() || uri.rawUserInfo != null || uri.rawFragment != null ||
+                uri.port > 65535 || uri.rawAuthority.endsWith(":")) return false
+            return uri.scheme.equals("https", ignoreCase = true) ||
+                (uri.scheme.equals("http", ignoreCase = true) &&
+                    listOf("localhost", "127.0.0.1", "[::1]").any { uri.host.equals(it, ignoreCase = true) })
+        }
+
         private const val STATUS = 1L
         private const val CONFIG = 2L
         private const val CONNECT = 3L

@@ -5,13 +5,13 @@ Checked on 22 October 2026. Times and dates for this project use Asia/Baghdad.
 ## Result
 
 - Debug APK and minified release APK: built successfully.
-- Unit tests on Windows: 53 total; 52 passed; zero failed; 1 skipped. On GitHub Linux: all 53 passed, zero skipped.
-- Android lint: zero errors; 63 warnings on Windows, 65 on GitHub. The two extra GitHub warnings concern newer Android SDK and build tool versions. Other warnings cover unused resources, English UI text, compatibility hints, and dependency versions. They were not hidden with a baseline.
+- Unit tests on Windows for 1.0.1: 60 total; 59 passed; zero failed; 1 skipped. The previous GitHub Linux release passed all 53 of its tests. Current Linux results are available from the release run in Actions.
+- Android lint for 1.0.1 on Windows: zero errors; 66 warnings. The warnings cover unused resources, English UI text, compatibility hints, and dependency versions. They were not hidden with a baseline. The previous GitHub run also reported newer Android SDK and build tool versions.
 - APK signatures: both verify. The release APK has valid v1 and v2 signatures.
 - Release signing certificate: saved RSA 3072-bit release key. SHA-256: `19025a51212f2bd0d86de0162a4ecec7c17dc22c31e7190aa845b48fb0bb13a7`. The debug APK uses the separate Android Debug key. The release key is also configured in encrypted GitHub Actions secrets.
 - Built APK label: My Trakt Wallpapers.
 - Built APK ID: `com.sww.projectivy.traktwallpapers`.
-- Version: 1.0.0 (versionCode 1). Minimum API 23; target API 36.
+- Version: 1.0.1 (versionCode 2). Minimum API 23; target API 36.
 - Built APK authorities and settings alias use the new app ID. Android backup and cleartext traffic are disabled.
 - Generated BuildConfig contains public API URLs, not personal API keys, OAuth tokens, or a Trakt client secret.
 - Source archive excludes local.properties, build folders, .git, signing keys, and personal credentials. A source scan found no literal credential assignments.
@@ -42,10 +42,13 @@ The reused upstream revision is `4ade48e9f45de2bb2d2db1a5c35b087593ab2212` from 
 - Rate-limit delays and fallback backoff.
 - Normal cache reordering does not look like newly published data and cause a refresh loop.
 - TV settings and About dialogs, all sources off on first use, and the new Projectivy settings alias.
+- Private Development app redirect defaults, exact saved HTTPS values, safe loopback validation, and the required Trakt credit.
 - QR login controls fit a 960 x 540 logical TV screen.
 - A native graphics test wrote a valid 3840 x 2160 JPEG with descriptions, rating, and a text title fallback. The rendered preview was also viewed locally.
 
-Tests use fixture data and a local mock API. No personal Trakt or TMDB credentials were supplied. Credential tests use an in-memory SecretStore; Android Keystore behavior still needs the device login and reboot check.
+Unit tests use fixture data and a local mock API. Credential tests use an in-memory SecretStore; Android Keystore behavior still needs the device login and reboot check.
+
+Separate live account checks were completed after registration: the private Development app is approved; the Trakt device-code endpoint accepted its client ID and returned a code; and TMDB movie and TV artwork endpoints both returned HTTP 200 with backdrops and logos. No personal API values were placed in source, build settings, test fixtures, or GitHub. A copy for device setup is encrypted with Windows DPAPI in a private folder outside the repository.
 
 ## One platform test is skipped on Windows
 
@@ -73,7 +76,7 @@ Release signing secrets are configured. Pushes run checks and builds; version ta
 
 [The release run](https://github.com/ammartaha/my-trakt-wallpapers/actions/runs/39744425386) passed and published [version 1.0.0](https://github.com/ammartaha/my-trakt-wallpapers/releases/tag/v1.0.0). The APK can be downloaded directly, without extracting an Actions artifact. Its SHA-256 is `42d461b6388cea101e4293b2240859ad2a801d9cece19c9a1852a61beccbcbb4`.
 
-Both recorded runs were started through `workflow_dispatch`. Push and pull-request triggers are configured. An automatic push run has not yet been observed on this new fork.
+Those two runs were started through `workflow_dispatch`. The owner-signed-in Actions page showed a separate one-time fork block, even though the repository API reported Actions enabled and the workflow active. Its **I understand my workflows, go ahead and enable them** button was enabled on 22 October. The next source push will verify the automatic trigger.
 
 ## Reports and preview
 

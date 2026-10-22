@@ -54,12 +54,16 @@ Use the release APK path instead when updating a release installation. USB/file-
 ### Trakt
 
 1. On your phone or computer, sign in to [Trakt API apps](https://developer.trakt.tv/apps).
-2. Create an API app for your personal wallpaper plugin.
-3. Use an HTTPS **Redirect URI**. For this device-code setup, you can use `https://github.com/`.
+2. Connect your verified GitHub account if Trakt asks, then create a **Development** app for personal use. Only you and members you add can sign in.
+3. Use `http://localhost/` as the **Redirect URI**. Development apps require a loopback address. Leave allowed origins empty for this Android TV device-code flow.
 4. Save the app and copy its **Client ID**.
 5. In the plugin's API settings, enter the Client ID and the same Redirect URI, including its final `/`.
 
 The device flow displays a code. It does not need you to host a website or callback. The redirect value is used for token refresh. Do not use the old `urn:ietf:wg:oauth:2.0:oob` value. The current [Trakt authentication guide](https://developer.trakt.tv/docs/authentication-oauth) and [OpenAPI specification](https://developer.trakt.tv/openapi.json) describe the device flow. This app does not need or send a Trakt **Client Secret**.
+
+The localhost URI is sent as text inside the HTTPS refresh request. The plugin does not start a local server or send HTTP traffic. Existing Production app settings can keep their registered HTTPS URI. Version 1.0.1 accepts both cases and keeps the exact saved URI.
+
+The [Trakt app requirements](https://developer.trakt.tv/docs/create-an-app) require agreement to its API terms and subscription to the GitHub API notices. These account steps have been completed for your app. Do not create a second app if yours is already listed.
 
 If Trakt marks an API app as unapproved or inactive, fix that app registration in Trakt. Creating more apps does not bypass Trakt limits.
 

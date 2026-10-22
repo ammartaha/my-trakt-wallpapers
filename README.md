@@ -77,4 +77,6 @@ Based on the Projectivy wallpaper provider sample and the work in `johnneerdael/
 
 Artwork and metadata come from [TMDB](https://www.themoviedb.org). This product uses the TMDB API but is not endorsed or certified by TMDB. Personal list membership comes from [Trakt](https://trakt.tv).
 
+My Trakt Wallpapers uses Trakt but is not endorsed or certified by Trakt.
+
 The plugin stores its data on your TV. It sends requests to Trakt and TMDB for the features you use. It does not upload your settings, tokens, or wallpapers to a custom server. See [data and credentials](docs/SETUP.md#data-and-credentials) for storage and deletion details.

@@ -51,6 +51,8 @@ The current [Trakt OpenAPI specification](https://developer.trakt.tv/openapi.jso
 
 OAuth requests use `https://auth.trakt.tv`; list requests use `https://api.trakt.tv`. The public redirect URI entered in the app must match the registered Trakt app. Device login does not require a hosted callback.
 
+The live app registration form was also checked. A Development app is private to its owner and added members, and requires a loopback redirect URI. Version 1.0.1 defaults to `http://localhost/` and accepts only exact loopback hosts for HTTP. Existing HTTPS registrations still work. The redirect is a JSON value in an HTTPS refresh call; it does not start a server or enable cleartext networking.
+
 The [authentication guide](https://developer.trakt.tv/docs/authentication-oauth) states that access tokens last seven days and refresh tokens are single-use. Stored token pairs must be replaced together. A failed legacy refresh can require a new login.
 
 The [pagination guide](https://developer.trakt.tv/docs/pagination) requires clients to use the returned page count and effective limit. A page limit of 250 is common. A requested page size must not be treated as proof that the list is complete.
@@ -58,6 +60,8 @@ The [pagination guide](https://developer.trakt.tv/docs/pagination) requires clie
 The [rate limit guide](https://developer.trakt.tv/docs/rate-limiting) requires `429` responses to respect `Retry-After`, or use limited backoff if the header is absent. Current standard GET limits are 500 calls per five minutes. They can change, so the plugin must not depend on that number.
 
 The [Trakt API use policy](https://developer.trakt.tv/docs/api-use-policy) permits on-device caches for user features. The [TMDB FAQ](https://developer.themoviedb.org/docs/faq) gives artwork attribution requirements.
+
+The About page includes the required Trakt non-endorsement notice. The developer's existing GitHub account is subscribed to the required Trakt API repository notices. No Trakt logo is added.
 
 The unmodified TMDB blue short logo is saved as `docs/assets/tmdb_logo.svg`. It comes from [the logo served by TMDB's official developer documentation](https://files.readme.io/29c6fee-blue_short.svg), referenced as `logoUrl` by the official FAQ page. Its original view box is `0 0 273.42 35.52`. The About screen uses an Android vector with the same geometry, colors, and aspect ratio. Compact SVG arc flags were expanded to Android-compatible path syntax.
 

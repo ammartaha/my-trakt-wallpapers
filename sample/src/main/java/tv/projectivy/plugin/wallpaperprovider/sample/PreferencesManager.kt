@@ -182,8 +182,8 @@ object PreferencesManager {
         set(value) { secrets.putAll(mapOf("client_id" to value.trim())) }
 
     var traktRedirectUri: String
-        get() = PreferencesManager["redirect_uri", "https://github.com/"]
-        set(value) { PreferencesManager["redirect_uri"] = value.trim() }
+        get() = PreferencesManager["redirect_uri", "http://localhost/"]
+        set(value) { PreferencesManager["redirect_uri"] = value }
 
     var tmdbApiKey: String
         get() = secrets.get("tmdb_api_key")
