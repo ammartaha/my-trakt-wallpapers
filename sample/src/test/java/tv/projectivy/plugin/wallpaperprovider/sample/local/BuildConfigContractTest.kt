@@ -1,3 +1,4 @@
+// Modified for My Trakt Wallpapers (2026).
 package tv.projectivy.plugin.wallpaperprovider.sample.local
 
 import com.traktlistbackdrops.tv.BuildConfig
@@ -8,11 +9,10 @@ import org.junit.Test
 class BuildConfigContractTest {
     @Test
     fun providerBuildConfigFieldsExist() {
-        assertNotNull(BuildConfig.TMDB_API_KEY)
+        assertEquals("com.sww.projectivy.traktwallpapers", BuildConfig.APPLICATION_ID)
         assertEquals("https://api.themoviedb.org/3/", BuildConfig.TMDB_API_URL.ifBlank { "https://api.themoviedb.org/3/" })
-        assertNotNull(BuildConfig.TRAKT_CLIENT_ID)
-        assertNotNull(BuildConfig.TRAKT_CLIENT_SECRET)
+        assertEquals(false, BuildConfig::class.java.fields.any { it.name in setOf("TRAKT_CLIENT_ID", "TRAKT_CLIENT_SECRET", "TMDB_API_KEY") })
         assertEquals("https://api.trakt.tv/", BuildConfig.TRAKT_API_URL.ifBlank { "https://api.trakt.tv/" })
-        assertEquals("urn:ietf:wg:oauth:2.0:oob", BuildConfig.TRAKT_REDIRECT_URI.ifBlank { "urn:ietf:wg:oauth:2.0:oob" })
+        assertEquals("https://auth.trakt.tv/", BuildConfig.TRAKT_AUTH_URL)
     }
 }

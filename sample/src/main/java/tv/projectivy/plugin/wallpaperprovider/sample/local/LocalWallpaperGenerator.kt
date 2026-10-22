@@ -1,144 +1,154 @@
+// Modified for My Trakt Wallpapers (2026).
 package tv.projectivy.plugin.wallpaperprovider.sample.local
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import com.traktlistbackdrops.tv.BuildConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
-import kotlin.random.Random
 import tv.projectivy.plugin.wallpaperprovider.sample.PreferencesManager
+import java.io.File
+import java.io.IOException
+import kotlin.coroutines.coroutineContext
+import kotlin.random.Random
 
 class LocalWallpaperGenerator(
     private val context: Context,
-    private val http: OkHttpClient = OkHttpClient()
+    private val http: OkHttpClient = ApiClients.http,
+    private val trakt: TraktLocalApi = ApiClients.trakt(),
+    private val auth: TraktDeviceAuthRepository = TraktDeviceAuthRepository(),
+    private val artwork: TmdbArtworkRepository = TmdbArtworkRepository(ApiClients.tmdb())
 ) {
-    private val traktApi = Retrofit.Builder()
-        .baseUrl(BuildConfig.TRAKT_API_URL.ifBlank { "https://api.trakt.tv/" })
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
-        .create(TraktLocalApi::class.java)
-
-    private val tmdbApi = Retrofit.Builder()
-        .baseUrl(BuildConfig.TMDB_API_URL.ifBlank { "https://api.themoviedb.org/3/" })
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
-        .create(TmdbLocalApi::class.java)
-
-    private val auth = TraktDeviceAuthRepository(traktApi)
-    private val tmdb = TmdbArtworkRepository(tmdbApi)
-    private val renderer = WallpaperRenderer()
     private val cache = WallpaperCache(context)
+    private val renderer = WallpaperRenderer()
 
-    suspend fun generate(): GeneratedWallpaper? = withContext(Dispatchers.IO) {
-        val authorization = auth.authorizationHeader() ?: return@withContext null
-        val apiKey = BuildConfig.TRAKT_CLIENT_ID.trim()
-        val selectedCatalogs = PreferencesManager.selectedCatalogs
-            .split(',')
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .toSet()
-
-        val candidates = mutableListOf<WallpaperCandidate>()
-
-        if ("anticipated_movies" in selectedCatalogs) {
-            val response = traktApi.anticipatedMovies(apiKey = apiKey, authorization = authorization, limit = 20)
-            candidates += response.body().orEmpty().mapNotNull { it.toWallpaperCandidate(CatalogKind.ANTICIPATED_MOVIE) }
+    suspend fun syncAndGenerate(force: Boolean = false): Int = withContext(Dispatchers.IO) {
+        WallpaperState.syncMutex.withLock {
+            val selected = SourceSelection.selected()
+            if (selected.isEmpty()) {
+                PreferencesManager.syncStatus = "No sources selected. Open My lists."
+                return@withLock 0
+            }
+            val signature = SourceSelection.signature(selected)
+            val previous = cache.snapshot()
+            var snapshot = previous
+            if (force || previous?.signature != signature ||
+                System.currentTimeMillis() - previous.updatedAt >= PreferencesManager.syncMinutes * 60_000L) {
+                PreferencesManager.syncStatus = "Checking selected Trakt lists..."
+                val authorization = auth.authorizationHeader()
+                    ?: throw IOException("Connect Trakt to check your lists. Saved wallpapers remain available.")
+                val candidates = TraktListRepository(trakt).candidates(selected, PreferencesManager.traktClientId, authorization)
+                coroutineContext.ensureActive()
+                if (signature != SourceSelection.signature()) return@withLock 0
+                snapshot = SourceSnapshot(signature, System.currentTimeMillis(), candidates)
+                cache.saveSnapshot(snapshot)
+            }
+            val current = snapshot
+            val allowed = current.candidates.map(::mediaKey).toSet()
+            cache.prune(allowed)
+            if (!force && System.currentTimeMillis() - PreferencesManager["last_generation_at", 0L] < 15 * 60_000L) {
+                setStatus(current, signature)
+                return@withLock 0
+            }
+            PreferencesManager["last_generation_at"] = System.currentTimeMillis()
+            val cached = cache.entries().map { it.key }.toSet()
+            val previousKeys = previous?.candidates.orEmpty().map(::mediaKey).toSet()
+            val missing = current.candidates.filter { mediaKey(it) !in cached && cache.failedUntil(mediaKey(it)) <= System.currentTimeMillis() }
+                .shuffled().sortedBy { mediaKey(it) in previousKeys }
+            var rendered = 0
+            // At most three 4K images and six metadata attempts per job. Work never grows with list size.
+            for (candidate in missing.take(6)) {
+                coroutineContext.ensureActive()
+                if (signature != SourceSelection.signature() || rendered >= 3) break
+                val details = artwork.details(candidate)
+                if (details == null) {
+                    cache.markUnavailable(mediaKey(candidate))
+                    continue
+                }
+                val backdrop = downloadBitmap(details.backdropUrl, 4096)
+                if (backdrop == null) {
+                    cache.markUnavailable(mediaKey(candidate))
+                    continue
+                }
+                var logo: Bitmap? = null
+                val output = cache.outputFile(details)
+                val temp = File(output.parentFile, output.name + ".tmp")
+                try {
+                    logo = details.logoUrl?.let { downloadBitmap(it, 1600) }
+                    PreferencesManager.syncStatus = "Creating wallpaper ${rendered + 1} of 3..."
+                    renderer.render(backdrop, logo, temp, details)
+                    coroutineContext.ensureActive()
+                    if (signature != SourceSelection.signature()) break
+                    check(temp.renameTo(output)) { "Unable to save wallpaper. Check free storage." }
+                    cache.publish(candidate, details, output)
+                    rendered++
+                } finally {
+                    logo?.recycle()
+                    backdrop.recycle()
+                    temp.delete()
+                }
+            }
+            cache.prune(allowed)
+            setStatus(current, signature)
+            rendered
         }
-        if ("anticipated_shows" in selectedCatalogs) {
-            val response = traktApi.anticipatedShows(apiKey = apiKey, authorization = authorization, limit = 20)
-            candidates += response.body().orEmpty().mapNotNull { it.toWallpaperCandidate(CatalogKind.ANTICIPATED_SHOW) }
-        }
-        if ("trending_movies" in selectedCatalogs) {
-            val response = traktApi.trendingMovies(apiKey = apiKey, authorization = authorization, limit = 20)
-            candidates += response.body().orEmpty().mapNotNull { it.toWallpaperCandidate(CatalogKind.TRENDING_MOVIE) }
-        }
-        if ("trending_shows" in selectedCatalogs) {
-            val response = traktApi.trendingShows(apiKey = apiKey, authorization = authorization, limit = 20)
-            candidates += response.body().orEmpty().mapNotNull { it.toWallpaperCandidate(CatalogKind.TRENDING_SHOW) }
-        }
-
-        selectedCatalogs.filter { it.startsWith("popular_list:") }.forEach { key ->
-            val option = parsePopularListKey(key) ?: return@forEach
-            val movieItems = traktApi.listItems(
-                userId = option.userId,
-                listId = option.listId,
-                type = "movies",
-                apiKey = apiKey,
-                authorization = authorization,
-                limit = 20
-            )
-            candidates += movieItems.body().orEmpty().mapNotNull { it.toWallpaperCandidate(CatalogKind.POPULAR_LIST_MOVIE) }
-
-            val showItems = traktApi.listItems(
-                userId = option.userId,
-                listId = option.listId,
-                type = "shows",
-                apiKey = apiKey,
-                authorization = authorization,
-                limit = 20
-            )
-            candidates += showItems.body().orEmpty().mapNotNull { it.toWallpaperCandidate(CatalogKind.POPULAR_LIST_SHOW) }
-        }
-
-        val randomized = randomizedCandidates(candidates, emptyList())
-
-        for (candidate in randomized) {
-            val details = tmdb.details(candidate) ?: continue
-            if (details.logoUrl.isNullOrBlank()) continue
-            val backdrop = downloadBitmap(details.backdropUrl) ?: continue
-            val logo = downloadBitmap(details.logoUrl) ?: continue
-            val file = cache.outputFile(details)
-            renderer.render(backdrop = backdrop, logo = logo, outputFile = file)
-            return@withContext GeneratedWallpaper(
-                title = details.title,
-                filePath = file.absolutePath,
-                contentUri = cache.contentUri(file)
-            )
-        }
-
-        null
     }
 
-    private fun downloadBitmap(url: String) =
-        http.newCall(Request.Builder().url(url).build()).execute().use { response ->
-            if (!response.isSuccessful) return@use null
-            response.body.byteStream().use(BitmapFactory::decodeStream)
+    private fun setStatus(snapshot: SourceSnapshot, signature: String) {
+        PreferencesManager.syncStatus = "${snapshot.candidates.size} selected titles; ${cache.eligible(signature).size} saved wallpapers. Last check: " +
+            java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT).format(java.util.Date(snapshot.updatedAt))
+    }
+
+    // Keep the old entry point useful to callers, but Projectivy itself only reads the durable cache.
+    suspend fun generate(): GeneratedWallpaper? {
+        syncAndGenerate()
+        return cache.choose()
+    }
+
+    private fun downloadBitmap(url: String, maxDimension: Int): Bitmap? {
+        val temp = File.createTempFile("artwork-", ".download", context.cacheDir)
+        try {
+            http.newCall(Request.Builder().url(url).build()).execute().use { response ->
+                if (!response.isSuccessful) {
+                    if (response.code == 404) return null
+                    throw ApiFailure(response.code)
+                }
+                if (response.body.contentLength() > 40L * 1024 * 1024) return null
+                response.body.byteStream().use { input ->
+                    temp.outputStream().use { output ->
+                        val buffer = ByteArray(8192)
+                        var total = 0L
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            if (total > 40L * 1024 * 1024) throw IOException("Artwork is too large.")
+                            output.write(buffer, 0, count)
+                        }
+                    }
+                }
+            }
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(temp.absolutePath, bounds)
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0 || bounds.outWidth > 32768 || bounds.outHeight > 32768) return null
+            var sample = 1
+            while (bounds.outWidth / sample > maxDimension || bounds.outHeight / sample > maxDimension) sample *= 2
+            return BitmapFactory.decodeFile(temp.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
+        } finally {
+            temp.delete()
         }
+    }
 
     companion object {
-        fun interleave(movies: List<WallpaperCandidate>, shows: List<WallpaperCandidate>): List<WallpaperCandidate> {
-            val result = mutableListOf<WallpaperCandidate>()
-            val max = maxOf(movies.size, shows.size)
-            for (index in 0 until max) {
-                movies.getOrNull(index)?.let(result::add)
-                shows.getOrNull(index)?.let(result::add)
-            }
-            return result
-        }
-
-        fun randomizedCandidates(
-            movies: List<WallpaperCandidate>,
-            shows: List<WallpaperCandidate>,
-            random: Random = Random.Default
-        ): List<WallpaperCandidate> =
-            (movies + shows).shuffled(random)
-
-        fun isRenderable(details: TmdbDetails, hasBackdrop: Boolean, hasLogo: Boolean): Boolean =
-            hasBackdrop && hasLogo && details.backdropUrl.isNotBlank() && !details.logoUrl.isNullOrBlank()
-
-        fun parsePopularListKey(key: String): TraktPopularListOption? {
-            val parts = key.split(':')
-            if (parts.size != 3 || parts[0] != "popular_list") return null
-            return TraktPopularListOption(
-                key = key,
-                title = "${parts[1]}/${parts[2]}",
-                userId = parts[1],
-                listId = parts[2]
-            )
-        }
+        fun interleave(movies: List<WallpaperCandidate>, shows: List<WallpaperCandidate>): List<WallpaperCandidate> =
+            (0 until maxOf(movies.size, shows.size)).flatMap { listOfNotNull(movies.getOrNull(it), shows.getOrNull(it)) }
+        fun randomizedCandidates(movies: List<WallpaperCandidate>, shows: List<WallpaperCandidate>, random: Random = Random.Default): List<WallpaperCandidate> =
+            (movies + shows).distinctBy(::mediaKey).shuffled(random)
+        fun isRenderable(details: TmdbDetails, hasBackdrop: Boolean, hasLogo: Boolean): Boolean = hasBackdrop && details.backdropUrl.isNotBlank()
+        fun parsePopularListKey(key: String): TraktPopularListOption? = TraktListRepository.parseListKey(key)?.takeIf { key.startsWith("popular_list:") }
     }
 }

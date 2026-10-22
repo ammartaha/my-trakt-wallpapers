@@ -1,3 +1,4 @@
+// Modified for My Trakt Wallpapers (2026).
 package tv.projectivy.plugin.wallpaperprovider.sample.local
 
 import com.google.gson.annotations.SerializedName
@@ -8,7 +9,9 @@ enum class CatalogKind(val isMovie: Boolean) {
     TRENDING_MOVIE(true),
     TRENDING_SHOW(false),
     POPULAR_LIST_MOVIE(true),
-    POPULAR_LIST_SHOW(false)
+    POPULAR_LIST_SHOW(false),
+    PERSONAL_LIST_MOVIE(true),
+    PERSONAL_LIST_SHOW(false)
 }
 
 data class TraktIds(
@@ -54,7 +57,9 @@ data class TraktListSummary(
     val name: String? = null,
     @SerializedName("item_count") val itemCount: Int? = null,
     val ids: TraktListIds? = null,
-    val user: TraktUserSummary? = null
+    val user: TraktUserSummary? = null,
+    @SerializedName("updated_at") val updatedAt: String? = null,
+    val privacy: String? = null
 )
 
 data class TraktListIds(
@@ -94,7 +99,13 @@ data class TmdbDetails(
     val title: String,
     val year: Int?,
     val backdropUrl: String,
-    val logoUrl: String?
+    val logoUrl: String?,
+    val overview: String = "",
+    val rating: Double? = null,
+    val runtime: Int? = null,
+    val genres: List<String> = emptyList(),
+    val tagline: String = "",
+    val isMovie: Boolean = true
 )
 
 data class GeneratedWallpaper(

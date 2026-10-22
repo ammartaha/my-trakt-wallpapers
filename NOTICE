@@ -1,0 +1,25 @@
+My Trakt Wallpapers
+
+This is a modified version of johnneerdael/traktlistbackdrops:
+https://github.com/johnneerdael/traktlistbackdrops
+Upstream revision: 4ade48e9f45de2bb2d2db1a5c35b087593ab2212
+
+The upstream project is based on z9m/projectivy-tvbgsuite-plugin and the
+Projectivy wallpaper provider sample. The original Apache License 2.0
+is retained in LICENSE. Existing source notices remain in place.
+
+Modifications made in October 2026 add personal Trakt lists, strict source
+selection, complete pagination, secure on-device login storage, durable
+wallpaper storage, scheduled background refresh, metadata rendering,
+separate application/provider identity, tests, build automation, and guides.
+See docs/UPSTREAM_REVIEW.md for the inspected upstream behavior and reuse.
+
+Artwork and metadata: The Movie Database (TMDB), https://www.themoviedb.org
+This product uses the TMDB API but is not endorsed or certified by TMDB.
+Official TMDB blue short logo source, preserved in docs/assets/tmdb_logo.svg:
+https://files.readme.io/29c6fee-blue_short.svg
+The asset is served by TMDB's official developer documentation.
+
+Personal list data: Trakt, https://trakt.tv
+Projectivy Launcher, Trakt, TMDB, and UGOOS are names of their respective
+owners. This custom plugin does not claim their endorsement.

@@ -1,3 +1,4 @@
+// Modified for My Trakt Wallpapers (2026).
 package tv.projectivy.plugin.wallpaperprovider.sample.local
 
 import com.google.gson.annotations.SerializedName
@@ -12,8 +13,17 @@ data class TmdbDetailsResponse(
     val name: String? = null,
     @SerializedName("release_date") val releaseDate: String? = null,
     @SerializedName("first_air_date") val firstAirDate: String? = null,
-    @SerializedName("backdrop_path") val backdropPath: String? = null
+    @SerializedName("backdrop_path") val backdropPath: String? = null,
+    val overview: String? = null,
+    val tagline: String? = null,
+    val runtime: Int? = null,
+    @SerializedName("episode_run_time") val episodeRunTime: List<Int>? = null,
+    @SerializedName("vote_average") val voteAverage: Double? = null,
+    @SerializedName("vote_count") val voteCount: Int? = null,
+    val genres: List<TmdbGenre>? = null
 )
+
+data class TmdbGenre(val id: Int, val name: String)
 
 data class TmdbImagesResponse(val logos: List<TmdbLogo> = emptyList())
 

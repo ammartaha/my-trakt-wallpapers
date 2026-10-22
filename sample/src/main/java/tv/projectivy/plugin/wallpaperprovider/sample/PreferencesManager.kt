@@ -1,3 +1,4 @@
+// Modified for My Trakt Wallpapers (2026).
 package tv.projectivy.plugin.wallpaperprovider.sample
 
 import android.content.Context
@@ -23,6 +24,11 @@ import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.forEach
 import kotlin.collections.mapTo
+import tv.projectivy.plugin.wallpaperprovider.sample.local.SecretStore
+import tv.projectivy.plugin.wallpaperprovider.sample.local.KeystoreSecretStore
+import tv.projectivy.plugin.wallpaperprovider.sample.local.TraktTokenResponse
+import java.util.UUID
+import tv.projectivy.plugin.wallpaperprovider.sample.local.WallpaperState
 
 object PreferencesManager {
     private const val IMAGE_URL_KEY = "image_url_key"
@@ -46,10 +52,14 @@ object PreferencesManager {
     private const val POPULAR_LIST_OPTIONS_KEY = "popular_list_options"
 
     lateinit var preferences: SharedPreferences
+    private lateinit var secrets: SecretStore
+    private val exportKeys = setOf(SELECTED_CATALOGS_KEY, REFRESH_ON_IDLE_EXIT_KEY, "sync_minutes", "cache_count")
 
-    fun init(context: Context) {
-        if (!::preferences.isInitialized) {
+    @Synchronized
+    fun init(context: Context, secretStore: SecretStore? = null) {
+        if (!::preferences.isInitialized || secretStore != null) {
             preferences = PreferenceManager.getDefaultSharedPreferences(context)
+            secrets = secretStore ?: KeystoreSecretStore(context.applicationContext)
         }
     }
 
@@ -132,36 +142,95 @@ object PreferencesManager {
         set(value) { PreferencesManager["preferred_client_key"] = value }
 
     var traktAccessToken: String
-        get() = PreferencesManager[TRAKT_ACCESS_TOKEN_KEY, ""]
-        set(value) { PreferencesManager[TRAKT_ACCESS_TOKEN_KEY] = value }
+        get() = secrets.get(TRAKT_ACCESS_TOKEN_KEY)
+        set(value) { secrets.putAll(mapOf(TRAKT_ACCESS_TOKEN_KEY to value)) }
 
     var traktRefreshToken: String
-        get() = PreferencesManager[TRAKT_REFRESH_TOKEN_KEY, ""]
-        set(value) { PreferencesManager[TRAKT_REFRESH_TOKEN_KEY] = value }
+        get() = secrets.get(TRAKT_REFRESH_TOKEN_KEY)
+        set(value) { secrets.putAll(mapOf(TRAKT_REFRESH_TOKEN_KEY to value)) }
 
     var traktExpiresAt: Long
-        get() = PreferencesManager[TRAKT_EXPIRES_AT_KEY, 0L]
-        set(value) { PreferencesManager[TRAKT_EXPIRES_AT_KEY] = value }
+        get() = secrets.get(TRAKT_EXPIRES_AT_KEY).toLongOrNull() ?: 0L
+        set(value) { secrets.putAll(mapOf(TRAKT_EXPIRES_AT_KEY to value.toString())) }
 
     var traktDeviceCode: String
-        get() = PreferencesManager[TRAKT_DEVICE_CODE_KEY, ""]
-        set(value) { PreferencesManager[TRAKT_DEVICE_CODE_KEY] = value }
+        get() = secrets.get(TRAKT_DEVICE_CODE_KEY)
+        set(value) { secrets.putAll(mapOf(TRAKT_DEVICE_CODE_KEY to value)) }
 
     var traktUserCode: String
-        get() = PreferencesManager[TRAKT_USER_CODE_KEY, ""]
-        set(value) { PreferencesManager[TRAKT_USER_CODE_KEY] = value }
+        get() = secrets.get(TRAKT_USER_CODE_KEY)
+        set(value) { secrets.putAll(mapOf(TRAKT_USER_CODE_KEY to value)) }
 
     var traktVerificationUrl: String
         get() = PreferencesManager[TRAKT_VERIFICATION_URL_KEY, ""]
         set(value) { PreferencesManager[TRAKT_VERIFICATION_URL_KEY] = value }
 
     var selectedCatalogs: String
-        get() = PreferencesManager[SELECTED_CATALOGS_KEY, "anticipated_movies,anticipated_shows,trending_movies,trending_shows"]
-        set(value) { PreferencesManager[SELECTED_CATALOGS_KEY] = value }
+        get() = PreferencesManager[SELECTED_CATALOGS_KEY, ""]
+        set(value) { synchronized(WallpaperState.lock) { PreferencesManager[SELECTED_CATALOGS_KEY] = value } }
 
     var popularListOptions: String
         get() = PreferencesManager[POPULAR_LIST_OPTIONS_KEY, ""]
         set(value) { PreferencesManager[POPULAR_LIST_OPTIONS_KEY] = value }
+
+    var personalListOptions: String
+        get() = PreferencesManager["personal_list_options", ""]
+        set(value) { PreferencesManager["personal_list_options"] = value }
+
+    var traktClientId: String
+        get() = secrets.get("client_id")
+        set(value) { secrets.putAll(mapOf("client_id" to value.trim())) }
+
+    var traktRedirectUri: String
+        get() = PreferencesManager["redirect_uri", "https://github.com/"]
+        set(value) { PreferencesManager["redirect_uri"] = value.trim() }
+
+    var tmdbApiKey: String
+        get() = secrets.get("tmdb_api_key")
+        set(value) { secrets.putAll(mapOf("tmdb_api_key" to value.trim())) }
+
+    var accountScope: String
+        get() = PreferencesManager["account_scope", ""]
+        set(value) { synchronized(WallpaperState.lock) { PreferencesManager["account_scope"] = value } }
+
+    var syncMinutes: Int
+        get() = PreferencesManager["sync_minutes", 60].takeIf { it in setOf(15, 60, 360) } ?: 60
+        set(value) { PreferencesManager["sync_minutes"] = value.takeIf { it in setOf(15, 60, 360) } ?: 60 }
+
+    var cacheCount: Int
+        get() = PreferencesManager["cache_count", 60].coerceIn(10, 60)
+        set(value) { PreferencesManager["cache_count"] = value.coerceIn(10, 60) }
+
+    var syncStatus: String
+        get() = PreferencesManager["sync_status", "Choose your lists, then select Refresh now."]
+        set(value) { PreferencesManager["sync_status"] = value }
+
+    var traktRetryAt: Long
+        get() = PreferencesManager["trakt_retry_at", 0L]
+        set(value) { PreferencesManager["trakt_retry_at"] = value }
+
+    var deviceExpiresAt: Long
+        get() = PreferencesManager["device_expires_at", 0L]
+        set(value) { PreferencesManager["device_expires_at"] = value }
+
+    var devicePollSeconds: Int
+        get() = PreferencesManager["device_poll_seconds", 5]
+        set(value) { PreferencesManager["device_poll_seconds"] = value.coerceAtLeast(1) }
+
+    fun saveTokens(token: TraktTokenResponse, now: Long, newLogin: Boolean = false) {
+        require(token.accessToken.isNotBlank() && token.refreshToken.isNotBlank()) { "Trakt returned empty login data." }
+        secrets.putAll(mapOf(TRAKT_ACCESS_TOKEN_KEY to token.accessToken,
+            TRAKT_REFRESH_TOKEN_KEY to token.refreshToken,
+            TRAKT_EXPIRES_AT_KEY to (token.createdAt.takeIf { it > 0 }?.plus(token.expiresIn) ?: (now + token.expiresIn)).toString(),
+            TRAKT_DEVICE_CODE_KEY to "", TRAKT_USER_CODE_KEY to ""))
+        if (newLogin) accountScope = UUID.randomUUID().toString()
+    }
+
+    fun clearLogin() {
+        secrets.putAll(mapOf(TRAKT_ACCESS_TOKEN_KEY to "", TRAKT_REFRESH_TOKEN_KEY to "",
+            TRAKT_EXPIRES_AT_KEY to "0", TRAKT_DEVICE_CODE_KEY to "", TRAKT_USER_CODE_KEY to ""))
+        accountScope = UUID.randomUUID().toString()
+    }
 
     fun export(): String {
         return convertSharedPreferencesToJson(preferences)
@@ -180,6 +249,7 @@ object PreferencesManager {
     private fun convertSharedPreferencesToJson(sharedPreferences: SharedPreferences): String {
         val prefsJsonObject = buildJsonObject {
             sharedPreferences.all.forEach { (key, value) ->
+                if (key !in exportKeys) return@forEach
                 when (value) {
                     is Int -> put(key, JsonPrimitive(value))
                     is Long -> put(key, JsonPrimitive(value))
@@ -204,28 +274,21 @@ object PreferencesManager {
         if (jsonElement is JsonObject) {
             val editor = sharedPreferences.edit()
             jsonElement.forEach { (key, value) ->
-                when (value) {
-                    is JsonPrimitive -> {
-                        when {
-                            value.isString -> editor.putString(key, value.content)
-                            value.booleanOrNull != null -> editor.putBoolean(key, value.boolean)
-                            value.intOrNull != null -> editor.putInt(key, value.int)
-                            value.floatOrNull != null -> editor.putFloat(key, value.float)
-                            value.longOrNull != null -> editor.putLong(key, value.long)
-                        }
-                    }
-
-                    is JsonArray -> {
-                         if (value.all { it is JsonPrimitive && it.isString }) {
-                             val set = value.mapTo(mutableSetOf()) { it.jsonPrimitive.content }
-                             editor.putStringSet(key, set)
-                         }
-                    }
-
-                    else -> throw IllegalArgumentException("Unsupported JSON element type for key $key")
+                if (key !in exportKeys) return@forEach
+                require(value is JsonPrimitive) { "Invalid setting type" }
+                when (key) {
+                    SELECTED_CATALOGS_KEY -> require(value.isString && value.content.length <= 32768) { "Invalid source selection" }
+                    REFRESH_ON_IDLE_EXIT_KEY -> require(!value.isString && value.booleanOrNull != null) { "Invalid idle setting" }
+                    "sync_minutes" -> require(!value.isString && value.intOrNull in setOf(15, 60, 360)) { "Invalid check interval" }
+                    "cache_count" -> require(!value.isString && value.intOrNull in setOf(10, 30, 60)) { "Invalid cache limit" }
+                }
+                when {
+                    value.isString -> editor.putString(key, value.content)
+                    value.booleanOrNull != null -> editor.putBoolean(key, value.boolean)
+                    value.intOrNull != null -> editor.putInt(key, value.int)
                 }
             }
-            editor.apply()
+            synchronized(WallpaperState.lock) { editor.apply() }
         } else {
             throw IllegalArgumentException("Expected JSON object for preferences import")
         }

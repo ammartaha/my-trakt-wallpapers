@@ -1,78 +1,80 @@
-# Trakt Wallpapers for Projectivy
+# My Trakt Wallpapers
 
-This Projectivy wallpaper provider APK generates TV wallpapers directly on Android TV. It authenticates with Trakt using device OAuth, reads selected Trakt catalogs, fetches backdrop and logo artwork from TMDB using built-in developer credentials, renders wallpapers locally, and returns local image URIs to Projectivy.
+Modified from [johnneerdael/traktlistbackdrops](https://github.com/johnneerdael/traktlistbackdrops), commit `4ade48e9f45de2bb2d2db1a5c35b087593ab2212`.
 
-It no longer requires a TVBG Suite web server for the local generation flow.
+A Projectivy Launcher wallpaper plugin for Android TV, including the UGOOS AM9 Pro. It reads your selected Trakt lists and makes 3840 x 2160 JPEG wallpapers on the TV. It needs no server, website hosting, or computer left on.
 
-## Runtime Flow
+**[Download the APK](https://github.com/ammartaha/my-trakt-wallpapers/releases/latest/download/My-Trakt-Wallpapers.apk).** No build tools are needed.
 
-1. Projectivy calls `WallpaperProviderService.getWallpapers`.
-2. The plugin refreshes or reuses Trakt OAuth tokens.
-3. The plugin fetches selected Trakt catalogs such as anticipated, trending, and popular lists.
-4. The plugin resolves TMDB details and logo/backdrop images.
-5. The plugin renders a 3840x2160 JPEG with upper-right artwork placement, left fade, bottom fade, and top-left title logo.
-6. The plugin returns a local FileProvider URI to Projectivy.
+Install **My Trakt Wallpapers**, connect your API accounts once, and select your lists. In Projectivy, choose this wallpaper provider. Leave extra catalogs off to show only your lists. See the [setup guide](docs/SETUP.md) for the exact TV menus.
 
-## Wallpaper Style
+The [GitHub repository](https://github.com/ammartaha/my-trakt-wallpapers), automatic builds, and saved release signing key are already set up. These are not setup steps for you. The signing key and passwords are kept out of the source and APK.
 
-- Output: 3840x2160 JPEG.
-- Backdrop: cover-cropped with an upper-right bias.
-- Logo: fit into a top-left logo box.
-- Gradients: left readability fade and bottom dark fade.
-- Catalogs: anticipated movies/shows, trending movies/shows, and selected popular Trakt lists.
+## Main features
 
-## Installation & Setup
+- Your own Trakt lists, including private lists with movies and TV series.
+- Only selected sources. Trending and anticipated titles are off by default.
+- Original 4K artwork, logo placement, crop, and dark fades.
+- Title fallback when no logo is available. Description, rating, year, runtime, and genres when available from TMDB.
+- Automatic list checks on the TV and a manual refresh button.
+- Saved wallpapers for offline use. Choose a limit of 10, 30, or 60 images, with a 512 MiB storage cap.
+- API settings and Trakt login on the TV. No personal API keys or login tokens in the APK or GitHub Actions.
 
-1. Install the debug APK from:
+If you change the selected sources while offline, connect once to load the new selection. The plugin does not offer wallpapers from the old selection. After a successful online check, removed list items stop being offered. A TV which is offline cannot detect remote list changes.
 
-   ```text
-   sample/build/outputs/apk/debug/sample-debug.apk
-   ```
+## Install beside the original
 
-2. Open Projectivy Launcher settings.
-3. Go to **Appearance** > **Wallpaper**.
-4. Select this plugin as the wallpaper source.
-5. Open plugin settings.
-6. Start Trakt OAuth and approve the QR/device code.
-7. Fetch popular Trakt lists, then enable the catalogs and lists you want.
+| Item | Custom plugin |
+| --- | --- |
+| App name | My Trakt Wallpapers |
+| App ID | `com.sww.projectivy.traktwallpapers` |
+| Provider UUID | `a9cb3f6c-421d-45b1-bd7f-d23b34c7d921` |
+| Android | Android 6.0 / API 23 or later |
+| Original app ID | `com.traktlistbackdrops.tv` |
 
-## Local Generator Build Properties
-
-Create `local.properties` in the project root:
-
-```properties
-TMDB_API_KEY=your_tmdb_v3_api_key
-TMDB_API_URL=https://api.themoviedb.org/3/
-TRAKT_CLIENT_ID=your_trakt_client_id
-TRAKT_CLIENT_SECRET=your_trakt_client_secret
-TRAKT_API_URL=https://api.trakt.tv/
-TRAKT_REDIRECT_URI=urn:ietf:wg:oauth:2.0:oob
-```
-
-The device-code OAuth flow uses `client_id` to start and `code + client_id + client_secret` to poll. The refresh flow uses `TRAKT_REDIRECT_URI`, defaulting to `urn:ietf:wg:oauth:2.0:oob`.
+The app IDs, provider authorities, and UUIDs are different. Installing this app keeps the original plugin installed.
 
 ## Build
 
-```bash
-./gradlew :sample:assembleDebug
+Use JDK 17 and Android SDK Platform 36. On Windows:
+
+```powershell
+.\gradlew.bat :sample:testDebugUnitTest :sample:lintDebug :sample:assembleDebug :sample:assembleRelease
 ```
 
-## Package
+On Linux or macOS, first run `chmod +x gradlew`, then use `./gradlew` instead. No Trakt or TMDB credentials are needed to build.
 
-```text
-com.traktlistbackdrops.tv
-```
+| Output | File |
+| --- | --- |
+| Debug APK | `sample/build/outputs/apk/debug/sample-debug.apk` |
+| Release APK | `sample/build/outputs/apk/release/sample-release.apk` |
+| Test report | `sample/build/reports/tests/testDebugUnitTest/index.html` |
+| Lint report | `sample/build/reports/lint-results-debug.html` |
 
-## Architecture
+Published APKs use the saved release key so updates can keep your settings and wallpapers. A separate local build uses a debug key unless you configure the release signing environment. See [GitHub Actions](docs/SETUP.md#github-actions).
 
-- `api/`: Projectivy wallpaper provider AIDL contract.
-- `sample/src/main/java/.../WallpaperProviderService.kt`: Projectivy service entry point.
-- `sample/src/main/java/.../local/TraktDeviceAuthRepository.kt`: Trakt OAuth.
-- `sample/src/main/java/.../local/AnticipatedCatalogRepository.kt`: Trakt catalog mapping.
-- `sample/src/main/java/.../local/TmdbArtworkRepository.kt`: TMDB details and artwork selection.
-- `sample/src/main/java/.../local/WallpaperRenderer.kt`: Android Canvas renderer.
-- `sample/src/main/java/.../local/WallpaperCache.kt`: Generated wallpaper files and FileProvider URIs.
+## How it works
 
-## License
+1. You connect Trakt with a QR code or device code.
+2. You fetch your lists and select the sources you want.
+3. WorkManager checks those sources while the TV has internet access.
+4. The plugin downloads TMDB art and renders wallpapers on the TV.
+5. Projectivy reads saved local files through FileProvider.
 
-Based on the Projectivy Plugin Sample.
+The source list is read in full using Trakt pagination headers. Each work run tries at most six titles and renders at most three images. Automatic generation waits at least 15 minutes between runs; manual refresh can run sooner. WorkManager survives reboot, but Android can delay work during sleep or power saving.
+
+## Source and tests
+
+The original Projectivy AIDL API and Android Canvas renderer are reused. The source namespace and `:sample` module name are kept to avoid an unnecessary source move. See [the upstream review](docs/UPSTREAM_REVIEW.md) for the exact changes.
+
+GitHub Actions runs unit tests, Android lint, and APK builds on pushes, pull requests, and manual runs. Version tags also publish a tested, signed APK to Releases. Pull requests cannot use the release signing secrets. UGOOS hardware tests are listed in the guide.
+
+Local results and remaining device checks are in [VERIFICATION.md](docs/VERIFICATION.md).
+
+## Credits and privacy
+
+Based on the Projectivy wallpaper provider sample and the work in `johnneerdael/traktlistbackdrops` and `z9m/projectivy-tvbgsuite-plugin`. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+Artwork and metadata come from [TMDB](https://www.themoviedb.org). This product uses the TMDB API but is not endorsed or certified by TMDB. Personal list membership comes from [Trakt](https://trakt.tv).
+
+The plugin stores its data on your TV. It sends requests to Trakt and TMDB for the features you use. It does not upload your settings, tokens, or wallpapers to a custom server. See [data and credentials](docs/SETUP.md#data-and-credentials) for storage and deletion details.

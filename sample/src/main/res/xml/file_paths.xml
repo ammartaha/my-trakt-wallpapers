@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Modified for My Trakt Wallpapers (2026). -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <cache-path name="generated_wallpapers" path="generated_wallpapers/" />
+    <files-path name="generated_wallpapers" path="wallpapers/" />
 </paths>

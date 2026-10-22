@@ -1,3 +1,4 @@
+// Modified for My Trakt Wallpapers (2026).
 package tv.projectivy.plugin.wallpaperprovider.sample
 
 import android.os.Bundle
@@ -5,106 +6,82 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.fragment.app.FragmentActivity
-import com.traktlistbackdrops.tv.BuildConfig
 import com.traktlistbackdrops.tv.R
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
-import tv.projectivy.plugin.wallpaperprovider.sample.local.QrCodeGenerator
-import tv.projectivy.plugin.wallpaperprovider.sample.local.TraktDeviceAuthRepository
-import tv.projectivy.plugin.wallpaperprovider.sample.local.TraktLocalApi
-import tv.projectivy.plugin.wallpaperprovider.sample.local.TraktPollResult
+import kotlinx.coroutines.*
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import tv.projectivy.plugin.wallpaperprovider.sample.local.*
 
 class TraktOAuthActivity : FragmentActivity() {
     private val scope = MainScope()
-    private var pollJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_trakt_oauth)
         PreferencesManager.init(applicationContext)
         findViewById<Button>(R.id.oauthClose).setOnClickListener { finish() }
-        startOrResumeOauth()
+        scope.launch {
+            try {
+                val repo = TraktDeviceAuthRepository()
+                if (PreferencesManager.traktDeviceCode.isBlank() || PreferencesManager.deviceExpiresAt <= System.currentTimeMillis() / 1000) {
+                    val result = repo.start()
+                    if (result.isFailure) {
+                        showStatus("Unable to start login. Check API settings and your internet connection.")
+                        return@launch
+                    }
+                }
+                showCode()
+                while (isActive && System.currentTimeMillis() / 1000 < PreferencesManager.deviceExpiresAt) {
+                    val serverWait = (PreferencesManager.traktRetryAt - System.currentTimeMillis()).coerceAtLeast(0)
+                    delay(maxOf(PreferencesManager.devicePollSeconds * 1000L, serverWait))
+                    when (val result = repo.poll()) {
+                        TraktPollResult.Approved -> {
+                            showStatus("Connected. Close this page, load My lists, then choose your lists.")
+                            delay(1500)
+                            finish()
+                            return@launch
+                        }
+                        TraktPollResult.Pending -> showStatus("Waiting for Trakt approval...")
+                        TraktPollResult.SlowDown -> showStatus("Trakt asked us to wait. Login will continue.")
+                        else -> {
+                            PreferencesManager.traktDeviceCode = ""
+                            PreferencesManager.traktUserCode = ""
+                            showStatus(when (result) {
+                                TraktPollResult.Denied -> "Login was denied. Close this page and connect again."
+                                is TraktPollResult.Failed -> result.message
+                                else -> "This code is no longer valid. Close this page and connect again."
+                            })
+                            return@launch
+                        }
+                    }
+                }
+                PreferencesManager.traktDeviceCode = ""
+                PreferencesManager.traktUserCode = ""
+                showStatus("This code expired. Close this page and connect again.")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                showStatus("Login could not finish. Check your internet connection, then connect again.")
+            }
+        }
     }
 
     override fun onDestroy() {
-        pollJob?.cancel()
+        scope.cancel()
         super.onDestroy()
     }
 
-    private fun startOrResumeOauth() {
-        scope.launch {
-            val repo = TraktDeviceAuthRepository(traktApi())
-            if (PreferencesManager.traktDeviceCode.isBlank()) {
-                val result = repo.start()
-                result.exceptionOrNull()?.let { error ->
-                    showStatus(error.message ?: "Unable to start Trakt OAuth")
-                    return@launch
-                }
-            }
-            showCode()
-            startPolling(repo)
-        }
-    }
-
     private fun showCode() {
-        val verificationUrl = PreferencesManager.traktVerificationUrl.ifBlank { "https://trakt.tv/activate" }
-        val userCode = PreferencesManager.traktUserCode
-        val activationUrl = "$verificationUrl/$userCode"
-        findViewById<TextView>(R.id.oauthUrl).text = activationUrl
-        findViewById<TextView>(R.id.oauthCode).text = userCode
-        findViewById<ImageView>(R.id.oauthQr).setImageBitmap(QrCodeGenerator.generate(activationUrl))
-        showStatus("Scan the QR code, approve Trakt, then wait here.")
-    }
-
-    private fun startPolling(repo: TraktDeviceAuthRepository) {
-        pollJob?.cancel()
-        pollJob = scope.launch {
-            while (true) {
-                delay(5000)
-                when (val result = repo.poll()) {
-                    is TraktPollResult.Approved -> {
-                        showStatus("Connected to Trakt.")
-                        delay(1000)
-                        finish()
-                        return@launch
-                    }
-                    TraktPollResult.Pending -> showStatus("Waiting for Trakt approval...")
-                    TraktPollResult.SlowDown -> showStatus("Trakt asked us to slow down. Waiting...")
-                    TraktPollResult.AlreadyUsed -> {
-                        showStatus("This code was already used. Close and start again.")
-                        return@launch
-                    }
-                    TraktPollResult.Denied -> {
-                        showStatus("Trakt authorization denied. Close and start again.")
-                        return@launch
-                    }
-                    TraktPollResult.Expired, TraktPollResult.InvalidDeviceCode -> {
-                        PreferencesManager.traktDeviceCode = ""
-                        PreferencesManager.traktUserCode = ""
-                        showStatus("Code expired. Close and start OAuth again.")
-                        return@launch
-                    }
-                    is TraktPollResult.Failed -> {
-                        showStatus(result.message)
-                        return@launch
-                    }
-                }
-            }
+        val verification = PreferencesManager.traktVerificationUrl.toHttpUrlOrNull()
+        check(verification != null && verification.isHttps && verification.host in setOf("trakt.tv", "app.trakt.tv", "auth.trakt.tv")) {
+            "Trakt returned an invalid activation address."
         }
+        val code = PreferencesManager.traktUserCode
+        val activation = verification.newBuilder().addPathSegment(code).build().toString()
+        findViewById<TextView>(R.id.oauthUrl).text = verification.toString()
+        findViewById<TextView>(R.id.oauthCode).text = code
+        findViewById<ImageView>(R.id.oauthQr).setImageBitmap(QrCodeGenerator.generate(activation))
+        showStatus("Scan the QR code, or open the address on your phone and enter the code.")
     }
 
-    private fun showStatus(message: String) {
-        findViewById<TextView>(R.id.oauthStatus).text = message
-    }
-
-    private fun traktApi(): TraktLocalApi =
-        Retrofit.Builder()
-            .baseUrl(BuildConfig.TRAKT_API_URL.ifBlank { "https://api.trakt.tv/" })
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(TraktLocalApi::class.java)
+    private fun showStatus(message: String) { findViewById<TextView>(R.id.oauthStatus).text = message }
 }

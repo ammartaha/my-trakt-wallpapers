@@ -1,3 +1,4 @@
+// Modified for My Trakt Wallpapers (2026).
 package tv.projectivy.plugin.wallpaperprovider.sample.local
 
 import org.junit.Assert.assertEquals
@@ -19,7 +20,7 @@ class LocalWallpaperGeneratorTest {
     }
 
     @Test
-    fun rejectsGenerationsWithoutBackdropOrLogo() {
+    fun needsBackdropButAllowsTextTitleWhenLogoIsMissing() {
         val details = TmdbDetails(
             id = 1,
             title = "Movie",
@@ -30,8 +31,8 @@ class LocalWallpaperGeneratorTest {
 
         assertEquals(true, LocalWallpaperGenerator.isRenderable(details, hasBackdrop = true, hasLogo = true))
         assertEquals(false, LocalWallpaperGenerator.isRenderable(details, hasBackdrop = false, hasLogo = true))
-        assertEquals(false, LocalWallpaperGenerator.isRenderable(details, hasBackdrop = true, hasLogo = false))
-        assertEquals(false, LocalWallpaperGenerator.isRenderable(details.copy(logoUrl = null), hasBackdrop = true, hasLogo = true))
+        assertEquals(true, LocalWallpaperGenerator.isRenderable(details, hasBackdrop = true, hasLogo = false))
+        assertEquals(true, LocalWallpaperGenerator.isRenderable(details.copy(logoUrl = null), hasBackdrop = true, hasLogo = false))
     }
 
     @Test

@@ -1,3 +1,4 @@
+// Modified for My Trakt Wallpapers (2026).
 package tv.projectivy.plugin.wallpaperprovider.sample.local
 
 import com.google.gson.annotations.SerializedName
@@ -21,14 +22,12 @@ data class TraktDeviceCodeResponse(
 
 data class TraktDeviceTokenRequest(
     val code: String,
-    @SerializedName("client_id") val clientId: String,
-    @SerializedName("client_secret") val clientSecret: String
+    @SerializedName("client_id") val clientId: String
 )
 
 data class TraktRefreshTokenRequest(
     @SerializedName("refresh_token") val refreshToken: String,
     @SerializedName("client_id") val clientId: String,
-    @SerializedName("client_secret") val clientSecret: String,
     @SerializedName("redirect_uri") val redirectUri: String,
     @SerializedName("grant_type") val grantType: String = "refresh_token"
 )
@@ -111,6 +110,45 @@ interface TraktLocalApi {
         @retrofit2.http.Path("type") type: String,
         @Header("trakt-api-key") apiKey: String,
         @Header("Authorization") authorization: String,
-        @Query("limit") limit: Int = 20
+        @Query("limit") limit: Int = 250,
+        @Query("page") page: Int = 1
+    ): Response<List<TraktListItem>>
+
+    @Headers("trakt-api-version: 2")
+    @GET("users/me/lists")
+    suspend fun personalLists(
+        @Header("trakt-api-key") apiKey: String,
+        @Header("Authorization") authorization: String,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 250
+    ): Response<List<TraktListSummary>>
+
+    @Headers("trakt-api-version: 2")
+    @GET("users/{id}/lists/{list_id}")
+    suspend fun personalList(
+        @retrofit2.http.Path("id") userId: String,
+        @retrofit2.http.Path("list_id") listId: String,
+        @Header("trakt-api-key") apiKey: String,
+        @Header("Authorization") authorization: String
+    ): Response<TraktListSummary>
+
+    @Headers("trakt-api-version: 2")
+    @GET("users/{id}/lists/{list_id}/items")
+    suspend fun allListItems(
+        @retrofit2.http.Path("id") userId: String,
+        @retrofit2.http.Path("list_id") listId: String,
+        @Header("trakt-api-key") apiKey: String,
+        @Header("Authorization") authorization: String,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 250
+    ): Response<List<TraktListItem>>
+
+    @Headers("trakt-api-version: 2")
+    @GET("users/me/watchlist")
+    suspend fun watchlist(
+        @Header("trakt-api-key") apiKey: String,
+        @Header("Authorization") authorization: String,
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 250
     ): Response<List<TraktListItem>>
 }

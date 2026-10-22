@@ -1,119 +1,56 @@
+// Modified for My Trakt Wallpapers (2026).
 package tv.projectivy.plugin.wallpaperprovider.sample
 
 import android.app.Service
 import android.content.Intent
 import android.net.Uri
+import android.os.Binder
 import android.os.IBinder
-import android.util.Log
-import kotlinx.coroutines.runBlocking
-import tv.projectivy.plugin.wallpaperprovider.api.Event
-import tv.projectivy.plugin.wallpaperprovider.api.IWallpaperProviderService
-import tv.projectivy.plugin.wallpaperprovider.api.Wallpaper
-import tv.projectivy.plugin.wallpaperprovider.api.WallpaperDisplayMode
-import tv.projectivy.plugin.wallpaperprovider.api.WallpaperType
-import tv.projectivy.plugin.wallpaperprovider.sample.local.LocalWallpaperGenerator
+import android.os.Process
+import tv.projectivy.plugin.wallpaperprovider.api.*
+import tv.projectivy.plugin.wallpaperprovider.sample.local.WallpaperCache
+import tv.projectivy.plugin.wallpaperprovider.sample.local.WallpaperWork
 
 class WallpaperProviderService : Service() {
-
     override fun onCreate() {
         super.onCreate()
-        Log.e("WallpaperService", "PROJECTIVY_LOG: Service onCreate")
         PreferencesManager.init(this)
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
-    }
-
-    override fun onBind(intent: Intent): IBinder {
-        Log.e("WallpaperService", "PROJECTIVY_LOG: Service onBind")
-        return binder
-    }
+    override fun onBind(intent: Intent): IBinder = binder
 
     private val binder = object : IWallpaperProviderService.Stub() {
         override fun getWallpapers(event: Event?): List<Wallpaper> {
-            Log.e("WallpaperService", "PROJECTIVY_LOG: getWallpapers | Event: ${event?.eventType} (${event?.javaClass?.simpleName}) ")
-
-            var forceRefresh = false
-
-            if (event is Event.LauncherIdleModeChanged) {
-                Log.e("WallpaperService", "PROJECTIVY_LOG: AIDL Idle Changed | isIdle: ${event.isIdle}")
-
-                if (!event.isIdle) {
-                    if (PreferencesManager.refreshOnIdleExit) {
-                        Log.e("WallpaperService", "PROJECTIVY_LOG: Idle exit detected and preference is ON. Triggering refresh.")
-                        forceRefresh = true
-                    } else {
-                        return lastWallpaper()
-                    }
-                } else {
-                    Log.e("WallpaperService", "PROJECTIVY_LOG: Idle enter detected. No refresh needed.")
-                    return emptyList()
-                }
+            checkCaller()
+            if (event is Event.LauncherIdleModeChanged && event.isIdle) return emptyList()
+            // Binder only reads local files. HTTP and 4K rendering run in WorkManager.
+            if (event !is Event.LauncherIdleModeChanged || PreferencesManager.refreshOnIdleExit) {
+                WallpaperWork.requestNow(this@WallpaperProviderService)
             }
-
-            if (event is Event.TimeElapsed || forceRefresh) {
-                Log.e("WallpaperService", "PROJECTIVY_LOG: Executing local wallpaper generation...")
-                try {
-                    val generated = runBlocking {
-                        LocalWallpaperGenerator(this@WallpaperProviderService).generate()
-                    }
-                    if (generated != null) {
-                        PreferencesManager.lastWallpaperUri = generated.contentUri
-                        PreferencesManager.lastWallpaperAuthor = generated.title
-                        grantWallpaperRead(generated.contentUri)
-                        return listOf(
-                            Wallpaper(
-                                uri = generated.contentUri,
-                                type = WallpaperType.IMAGE,
-                                displayMode = WallpaperDisplayMode.CROP,
-                                title = generated.title,
-                                author = generated.title,
-                                actionUri = null
-                            )
-                        )
-                    }
-                } catch (error: Exception) {
-                    Log.e("WallpaperService", "PROJECTIVY_LOG: Local generation failed", error)
-                }
-
-                return lastWallpaper()
-            }
-
-            Log.e("WallpaperService", "PROJECTIVY_LOG: Event type ${event?.javaClass?.simpleName} not handled by service for refresh.")
-            return emptyList()
+            val saved = WallpaperCache(this@WallpaperProviderService).choose() ?: return emptyList()
+            grantUriPermission(PROJECTIVY_PACKAGE_ID, Uri.parse(saved.contentUri), Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            return listOf(Wallpaper(uri = saved.contentUri, type = WallpaperType.IMAGE,
+                displayMode = WallpaperDisplayMode.CROP, title = saved.title, author = "Trakt Â· TMDB", actionUri = null))
         }
 
-        override fun getPreferences(): String = PreferencesManager.export()
-        override fun setPreferences(params: String) { PreferencesManager.import(params) }
-    }
+        override fun getPreferences(): String {
+            checkCaller()
+            return PreferencesManager.export()
+        }
 
-    private fun lastWallpaper(): List<Wallpaper> {
-        val lastUri = PreferencesManager.lastWallpaperUri
-        val lastAuthor = PreferencesManager.lastWallpaperAuthor
-        return if (lastUri.isNotBlank()) {
-            grantWallpaperRead(lastUri)
-            listOf(
-                Wallpaper(
-                    uri = lastUri,
-                    type = WallpaperType.IMAGE,
-                    displayMode = WallpaperDisplayMode.CROP,
-                    author = lastAuthor.ifBlank { null },
-                    actionUri = null
-                )
-            )
-        } else {
-            emptyList()
+        override fun setPreferences(params: String) {
+            checkCaller()
+            if (PreferencesManager.import(params)) {
+                WallpaperWork.schedule(this@WallpaperProviderService)
+                WallpaperWork.requestNow(this@WallpaperProviderService, force = true)
+            }
         }
     }
 
-    private fun grantWallpaperRead(uri: String) {
-        try {
-            grantUriPermission(PROJECTIVY_PACKAGE_ID, Uri.parse(uri), Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            Log.e("WallpaperService", "PROJECTIVY_LOG: Granted Projectivy read permission for $uri")
-        } catch (error: Exception) {
-            Log.e("WallpaperService", "PROJECTIVY_LOG: Failed to grant wallpaper URI permission", error)
-        }
+    private fun checkCaller() {
+        val uid = Binder.getCallingUid()
+        if (uid != Process.myUid() && packageManager.getPackagesForUid(uid)?.contains(PROJECTIVY_PACKAGE_ID) != true)
+            throw SecurityException("Only Projectivy Launcher can use this provider.")
     }
 
     companion object {

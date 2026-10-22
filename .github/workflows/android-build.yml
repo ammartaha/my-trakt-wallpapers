@@ -1,59 +1,129 @@
-name: Android Build & Release
+# Modified for My Trakt Wallpapers: tests, lint, runtime credentials, and optional stable signing.
+name: Android Build
 
 on:
   push:
-    branches:
-      - "main"
-      - "dev"
+  pull_request:
   workflow_dispatch:
 
-# Damit das Skript Releases erstellen darf
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6
         with:
           java-version: '17'
-          distribution: 'temurin'
+          distribution: temurin
           cache: gradle
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Install build SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
 
-      # NEU: Datei suchen, umbenennen und ins Hauptverzeichnis holen
-      - name: Rename and Move APK
+      - name: Test, lint, and build debug APK
         run: |
-          find . -name "*-debug.apk" -exec mv {} projectivy-tvbgsuite-plugin.apk \;
-          echo "APK wurde umbenannt und verschoben."
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace :sample:testDebugUnitTest :sample:lintDebug :sample:assembleDebug
 
-      # Schritt für DEV & MAIN: Als Artifact hochladen (für schnelle Tests)
-      # Jetzt liegt die Datei direkt im Root, also keine Unterordner mehr im ZIP!
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: projectivy-tvbgsuite-plugin
-          path: projectivy-tvbgsuite-plugin.apk
-          retention-days: 5
+      # PR code never receives signing secrets, even for a PR within this repository.
+      - name: Restore optional release signing key
+        id: signing
+        if: github.event_name != 'pull_request'
+        env:
+          SIGNING_KEY_BASE64: ${{ secrets.MYTRAKT_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* && -z "$SIGNING_KEY_BASE64" ]]; then
+            echo 'A published release needs the saved release signing key.' >&2
+            exit 1
+          fi
+          if [ -n "$SIGNING_KEY_BASE64" ]; then
+            umask 077
+            key_file="$RUNNER_TEMP/my-trakt-release.jks"
+            printf '%s' "$SIGNING_KEY_BASE64" | base64 --decode > "$key_file"
+            printf 'store_file=%s\n' "$key_file" >> "$GITHUB_OUTPUT"
+          fi
 
-      # NEU: Schritt nur für MAIN: Ein "Latest Release" erstellen
-      - name: Update Latest Release
-        if: github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v2
+      - name: Build release APK
+        env:
+          MYTRAKT_RELEASE_STORE_FILE: ${{ steps.signing.outputs.store_file }}
+          MYTRAKT_RELEASE_STORE_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.MYTRAKT_RELEASE_STORE_PASSWORD || '' }}
+          MYTRAKT_RELEASE_KEY_ALIAS: ${{ github.event_name != 'pull_request' && secrets.MYTRAKT_RELEASE_KEY_ALIAS || '' }}
+          MYTRAKT_RELEASE_KEY_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.MYTRAKT_RELEASE_KEY_PASSWORD || '' }}
+        run: ./gradlew --no-daemon --stacktrace :sample:assembleRelease
+
+      - name: Upload APKs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          tag_name: latest
-          name: Latest Stable Build
-          body: "Automatisch erstellter Build vom Main-Branch."
-          files: projectivy-tvbgsuite-plugin.apk
-          make_latest: true
+          name: my-trakt-wallpapers-apks
+          path: |
+            sample/build/outputs/apk/debug/sample-debug.apk
+            sample/build/outputs/apk/release/sample-release.apk
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload test and lint reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: my-trakt-wallpapers-checks
+          path: |
+            sample/build/reports/tests/
+            sample/build/test-results/
+            sample/build/reports/lint-results-*
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Remove temporary signing key
+        if: always() && steps.signing.outputs.store_file != ''
+        run: rm -f -- "$RUNNER_TEMP/my-trakt-release.jks"
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download tested APKs
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: my-trakt-wallpapers-apks
+          path: apks
+
+      - name: Publish installable APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          apk="My-Trakt-Wallpapers.apk"
+          cp apks/release/sample-release.apk "$apk"
+          sha256sum "$apk" > SHA256SUMS.txt
+          printf '%s\n' \
+            'Install the APK below on your Android TV.' \
+            'Builds, tests, and release signing are automatic. No computer or server is needed after installation.' \
+            'See the README for the short setup guide.' > release-notes.md
+          gh release create "$GITHUB_REF_NAME" "$apk" SHA256SUMS.txt \
+            --verify-tag --target "$GITHUB_SHA" \
+            --title "My Trakt Wallpapers ${version}" --notes-file release-notes.md

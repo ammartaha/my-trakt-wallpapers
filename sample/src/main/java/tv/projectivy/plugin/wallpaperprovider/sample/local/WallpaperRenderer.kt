@@ -1,3 +1,4 @@
+// Modified for My Trakt Wallpapers (2026).
 package tv.projectivy.plugin.wallpaperprovider.sample.local
 
 import android.graphics.Bitmap
@@ -7,6 +8,12 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Shader
+import android.graphics.Typeface
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
+import android.text.TextUtils
+import java.util.Locale
 import java.io.File
 import java.io.FileOutputStream
 
@@ -14,9 +21,11 @@ class WallpaperRenderer(private val spec: WallpaperRenderSpec = WallpaperRenderS
     fun render(
         backdrop: Bitmap,
         logo: Bitmap?,
-        outputFile: File
+        outputFile: File,
+        details: TmdbDetails? = null
     ) {
         val output = Bitmap.createBitmap(spec.width, spec.height, Bitmap.Config.ARGB_8888)
+        try {
         val canvas = Canvas(output)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
@@ -33,11 +42,50 @@ class WallpaperRenderer(private val spec: WallpaperRenderSpec = WallpaperRenderS
             canvas.drawBitmap(logo, Rect(0, 0, logo.width, logo.height), spec.containRect(logo.width, logo.height, spec.logoBox), paint)
         }
 
+        if (details != null) drawDetails(canvas, details, logo != null)
+
         outputFile.parentFile?.mkdirs()
         FileOutputStream(outputFile).use { stream ->
-            output.compress(Bitmap.CompressFormat.JPEG, 92, stream)
+            check(output.compress(Bitmap.CompressFormat.JPEG, 92, stream)) { "Unable to encode wallpaper." }
         }
-        output.recycle()
+        } finally {
+            output.recycle()
+        }
+    }
+
+    private fun drawDetails(canvas: Canvas, details: TmdbDetails, hasLogo: Boolean) {
+        if (!hasLogo) drawText(canvas, details.title, spec.logoBox.left, spec.logoBox.top + 25f, 1040, 92f, 3, true)
+        val metadata = listOfNotNull(
+            details.year?.toString(),
+            if (details.isMovie) "Movie" else "TV series",
+            details.runtime?.takeIf { it > 0 }?.let { "$it min" },
+            details.rating?.let { "TMDB ${String.format(Locale.US, "%.1f", it)}/10" }
+        ).joinToString("  ·  ")
+        drawText(canvas, metadata, 380f, 675f, 1140, 36f, 1)
+        drawText(canvas, details.genres.joinToString("  ·  "), 380f, 730f, 1040, 34f, 1)
+        var top = 805f
+        if (details.tagline.isNotBlank()) {
+            drawText(canvas, details.tagline, 380f, top, 1040, 38f, 2, true)
+            top += 105f
+        }
+        drawText(canvas, details.overview, 380f, top, 1040, 37f, 6)
+    }
+
+    private fun drawText(canvas: Canvas, text: String, x: Float, y: Float, width: Int, size: Float, lines: Int, bold: Boolean = false) {
+        if (text.isBlank()) return
+        val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(236, 237, 240)
+            textSize = size
+            typeface = if (bold) Typeface.create("sans-serif", Typeface.BOLD) else Typeface.create("sans-serif", Typeface.NORMAL)
+            setShadowLayer(3f, 1f, 1f, Color.BLACK)
+        }
+        val layout = StaticLayout.Builder.obtain(text, 0, text.length, paint, width)
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL).setIncludePad(false)
+            .setLineSpacing(8f, 1f).setMaxLines(lines).setEllipsize(TextUtils.TruncateAt.END).build()
+        val saved = canvas.save()
+        canvas.translate(x, y)
+        layout.draw(canvas)
+        canvas.restoreToCount(saved)
     }
 
     private fun drawDarkBackdropUnderlay(canvas: Canvas, backdrop: Bitmap, paint: Paint) {

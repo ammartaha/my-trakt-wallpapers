@@ -1,19 +1,21 @@
+// Modified for My Trakt Wallpapers (2026).
 package tv.projectivy.plugin.wallpaperprovider.sample.local
 
-import com.traktlistbackdrops.tv.BuildConfig
+import tv.projectivy.plugin.wallpaperprovider.sample.PreferencesManager
 
 class TmdbArtworkRepository(private val api: TmdbLocalApi) {
     suspend fun details(candidate: WallpaperCandidate): TmdbDetails? {
-        val apiKey = BuildConfig.TMDB_API_KEY.trim()
+        val apiKey = PreferencesManager.tmdbApiKey
         if (apiKey.isBlank()) return null
-        val isMovie = candidate.catalog == CatalogKind.ANTICIPATED_MOVIE
+        val isMovie = candidate.catalog.isMovie
 
         val detailsResponse = if (isMovie) api.movieDetails(candidate.tmdbId, apiKey) else api.showDetails(candidate.tmdbId, apiKey)
-        val detailsBody = detailsResponse.body()
-        if (!detailsResponse.isSuccessful || detailsBody?.backdropPath.isNullOrBlank()) return null
+        if (detailsResponse.code() == 404) return null
+        val detailsBody = detailsResponse.checkedBody("TMDB")
+        if (detailsBody.backdropPath.isNullOrBlank()) return null
 
         val imagesResponse = if (isMovie) api.movieImages(candidate.tmdbId, apiKey) else api.showImages(candidate.tmdbId, apiKey)
-        val logoUrl = imagesResponse.body()?.let(::selectLogoUrl)
+        val logoUrl = if (imagesResponse.code() == 404) null else selectLogoUrl(imagesResponse.checkedBody("TMDB"))
         val title = detailsBody.title ?: detailsBody.name ?: candidate.title
         val year = (detailsBody.releaseDate ?: detailsBody.firstAirDate)?.take(4)?.toIntOrNull() ?: candidate.year
 
@@ -22,7 +24,13 @@ class TmdbArtworkRepository(private val api: TmdbLocalApi) {
             title = title,
             year = year,
             backdropUrl = imageUrl(detailsBody.backdropPath),
-            logoUrl = logoUrl
+            logoUrl = logoUrl,
+            overview = detailsBody.overview.orEmpty(),
+            tagline = detailsBody.tagline.orEmpty(),
+            rating = detailsBody.voteAverage?.takeIf { it > 0 && (detailsBody.voteCount ?: 0) > 0 },
+            runtime = detailsBody.runtime ?: detailsBody.episodeRunTime?.firstOrNull(),
+            genres = detailsBody.genres.orEmpty().map { it.name },
+            isMovie = isMovie
         )
     }
 
