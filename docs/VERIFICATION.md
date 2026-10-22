@@ -5,8 +5,8 @@ Checked on 22 October 2026. Times and dates for this project use Asia/Baghdad.
 ## Result
 
 - Debug APK and minified release APK: built successfully.
-- Unit tests on Windows for 1.0.1: 60 total; 59 passed; zero failed; 1 skipped. The previous GitHub Linux release passed all 53 of its tests. Current Linux results are available from the release run in Actions.
-- Android lint for 1.0.1 on Windows: zero errors; 66 warnings. The warnings cover unused resources, English UI text, compatibility hints, and dependency versions. They were not hidden with a baseline. The previous GitHub run also reported newer Android SDK and build tool versions.
+- Unit tests for 1.0.1: all 60 passed on GitHub Linux, zero failed or skipped. On Windows: 59 passed, zero failed, 1 platform-specific skip.
+- Android lint for 1.0.1: zero errors; 66 warnings on Windows and 68 on GitHub. The warnings cover unused resources, English UI text, compatibility hints, and dependency versions. They were not hidden with a baseline. GitHub also reports newer Android SDK and build tool versions.
 - APK signatures: both verify. The release APK has valid v1 and v2 signatures.
 - Release signing certificate: saved RSA 3072-bit release key. SHA-256: `19025a51212f2bd0d86de0162a4ecec7c17dc22c31e7190aa845b48fb0bb13a7`. The debug APK uses the separate Android Debug key. The release key is also configured in encrypted GitHub Actions secrets.
 - Built APK label: My Trakt Wallpapers.
@@ -76,7 +76,9 @@ Release signing secrets are configured. Pushes run checks and builds; version ta
 
 [The release run](https://github.com/ammartaha/my-trakt-wallpapers/actions/runs/39744425386) passed and published [version 1.0.0](https://github.com/ammartaha/my-trakt-wallpapers/releases/tag/v1.0.0). The APK can be downloaded directly, without extracting an Actions artifact. Its SHA-256 is `42d461b6388cea101e4293b2240859ad2a801d9cece19c9a1852a61beccbcbb4`.
 
-Those two runs were started through `workflow_dispatch`. The owner-signed-in Actions page showed a separate one-time fork block, even though the repository API reported Actions enabled and the workflow active. Its **I understand my workflows, go ahead and enable them** button was enabled on 22 October. The next source push will verify the automatic trigger.
+Those two earlier runs were started through `workflow_dispatch`. The owner-signed-in Actions page showed a separate one-time fork block, even though the repository API reported Actions enabled and the workflow active. Its **I understand my workflows, go ahead and enable them** button was enabled on 22 October. Both the [source push](https://github.com/ammartaha/my-trakt-wallpapers/actions/runs/39765066985) and the [1.0.1 tag push](https://github.com/ammartaha/my-trakt-wallpapers/actions/runs/39765139278) then started automatically with event `push`.
+
+[The automatic 1.0.1 release run](https://github.com/ammartaha/my-trakt-wallpapers/actions/runs/39765139278) passed all 60 tests, lint, both APK builds, and publication. [Version 1.0.1](https://github.com/ammartaha/my-trakt-wallpapers/releases/tag/v1.0.1) is published. The release APK SHA-256 is `3bacb28ba14f475600b0910c8973f552c9275d654e344f08b8b9cbd43fd4ef9e`.
 
 ## Reports and preview
 
