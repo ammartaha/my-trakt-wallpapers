@@ -1,12 +1,12 @@
-# Local verification
+# Build verification
 
 Checked on 22 October 2026. Times and dates for this project use Asia/Baghdad.
 
 ## Result
 
 - Debug APK and minified release APK: built successfully.
-- Unit tests: 53 total; 52 passed; zero failed; 1 skipped.
-- Android lint: zero errors; 63 warnings. The warnings cover unused resources, English UI text, compatibility hints, and newer dependency versions. They were not hidden with a baseline.
+- Unit tests on Windows: 53 total; 52 passed; zero failed; 1 skipped. On GitHub Linux: all 53 passed, zero skipped.
+- Android lint: zero errors; 63 warnings on Windows, 65 on GitHub. The two extra GitHub warnings concern newer Android SDK and build tool versions. Other warnings cover unused resources, English UI text, compatibility hints, and dependency versions. They were not hidden with a baseline.
 - APK signatures: both verify. The release APK has valid v1 and v2 signatures.
 - Release signing certificate: saved RSA 3072-bit release key. SHA-256: `19025a51212f2bd0d86de0162a4ecec7c17dc22c31e7190aa845b48fb0bb13a7`. The debug APK uses the separate Android Debug key. The release key is also configured in encrypted GitHub Actions secrets.
 - Built APK label: My Trakt Wallpapers.
@@ -49,7 +49,7 @@ Tests use fixture data and a local mock API. No personal Trakt or TMDB credentia
 
 ## One platform test is skipped on Windows
 
-`androidFileProviderSharesOnlyGeneratedFiles` is enabled on Linux GitHub Actions. It is skipped on Windows because AndroidX FileProvider's Android path check uses `/`, while the Windows JVM uses `\` paths. See [the AndroidX source](https://github.com/androidx/androidx/blob/androidx-main/core/core/src/main/java/androidx/core/content/FileProvider.java). The app still uses the standard FileProvider. The durable cache tests run on Windows.
+`androidFileProviderSharesOnlyGeneratedFiles` passed on Linux GitHub Actions. It is skipped on Windows because AndroidX FileProvider's Android path check uses `/`, while the Windows JVM uses `\` paths. See [the AndroidX source](https://github.com/androidx/androidx/blob/androidx-main/core/core/src/main/java/androidx/core/content/FileProvider.java). The app still uses the standard FileProvider. The durable cache tests run on both systems.
 
 ## Checks which still need your TV
 
@@ -67,7 +67,9 @@ The complete device checklist is in [SETUP.md](SETUP.md#device-checks).
 
 ## GitHub Actions status
 
-The fork is [ammartaha/my-trakt-wallpapers](https://github.com/ammartaha/my-trakt-wallpapers). Release signing secrets are configured. Pushes run checks and builds; version tags also publish the tested signed APK. The first live run is being checked. See [Actions](https://github.com/ammartaha/my-trakt-wallpapers/actions).
+The fork is [ammartaha/my-trakt-wallpapers](https://github.com/ammartaha/my-trakt-wallpapers). [The first live build](https://github.com/ammartaha/my-trakt-wallpapers/actions/runs/39742918246) passed all 53 tests, lint, and both APK builds. The downloaded GitHub release APK also passed signature verification and uses the same saved release certificate as the local release.
+
+Release signing secrets are configured. Pushes run checks and builds; version tags also publish the tested signed APK. The workflow can also publish when run manually on a version tag. Pull requests cannot receive signing secrets. See [Actions](https://github.com/ammartaha/my-trakt-wallpapers/actions).
 
 ## Reports and preview
 
