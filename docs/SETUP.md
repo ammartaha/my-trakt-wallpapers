@@ -100,13 +100,13 @@ If a code expires, close the login screen and start again. If you get `invalid_g
 
 Private lists work through your approved Trakt account. A list can contain both movies and TV series. Unsupported list item types, such as people, do not become wallpapers. Titles without a usable TMDB ID or backdrop cannot be rendered.
 
-If **Load my Trakt lists** returns zero lists, **My watchlist** is still available. An empty watchlist creates no wallpapers. Add the titles you want in Trakt, then refresh. You can also select **Trending movies** in **Extra catalogs (optional)** if you want that source. Each source must be selected before it is used.
+If **Load my Trakt lists** returns zero lists, **My watchlist** is still available. An empty watchlist creates no wallpapers. Add the titles you want in Trakt, then refresh. You can also select **Trending movies** and **Trending TV series** in **Extra catalogs (optional)**. Enable each source you want. Each trending source currently requests 20 titles per check.
 
 Trending, anticipated, and popular public lists are optional sources. They start off. Use **Load popular lists (optional)** only if you want to choose public lists. The plugin never enables another source as a fallback. An empty selection returns no wallpapers.
 
 List membership is read in full. Duplicate movie or TV IDs appear only once. Only direct movie and show items are used; seasons, episodes, and people are ignored.
 
-Each work run tries at most six titles and renders at most three images. A title with missing metadata or a missing backdrop is skipped for 24 hours. A missing logo uses the title as text. A large list can take several runs to fill the saved collection. Not every list title is stored at the same time.
+Each work run tries at most 20 titles and renders at most 10 images. Images are rendered one at a time. The saved collection is still limited to 60 wallpapers and 512 MiB. A title with missing metadata or a missing backdrop is skipped for 24 hours. A missing logo uses the title as text. A large list can take several runs to fill the saved collection. Not every list title is stored at the same time.
 
 ## 6. Select the plugin in Projectivy
 

@@ -61,7 +61,7 @@ Published APKs use the saved release key so updates can keep your settings and w
 4. The plugin downloads TMDB art and renders wallpapers on the TV.
 5. Projectivy reads saved local files through FileProvider.
 
-The source list is read in full using Trakt pagination headers. Each work run tries at most six titles and renders at most three images. Automatic generation waits at least 15 minutes between runs; manual refresh can run sooner. WorkManager survives reboot, but Android can delay work during sleep or power saving.
+The source list is read in full using Trakt pagination headers. Each work run tries at most 20 titles and renders at most 10 images. Automatic generation waits at least 15 minutes between runs; manual refresh can run sooner. Saved storage remains limited to 60 wallpapers and 512 MiB. WorkManager survives reboot, but Android can delay work during sleep or power saving.
 
 ## Source and tests
 

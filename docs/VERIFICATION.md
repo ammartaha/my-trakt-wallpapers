@@ -5,14 +5,14 @@ Checked on 23 October 2026. Times and dates for this project use Asia/Baghdad.
 ## Result
 
 - Debug APK and minified release APK: built successfully.
-- Unit tests for 1.0.2: all 62 passed on GitHub Linux, zero failed or skipped. On Windows: 61 passed, zero failed, 1 platform-specific skip.
-- Android lint for 1.0.2: zero errors; 66 warnings on Windows and 68 on GitHub. The warnings cover unused resources, English UI text, compatibility hints, and dependency versions. They were not hidden with a baseline.
+- Unit tests for 1.0.3 on Windows: 64 tests, 63 passed, zero failed, 1 platform-specific skip. The tagged GitHub run is recorded below after completion.
+- Android lint for 1.0.3: zero errors and 66 warnings on Windows. The warnings cover unused resources, English UI text, compatibility hints, and dependency versions. They were not hidden with a baseline.
 - APK signatures: both verify. The release APK has valid v1 and v2 signatures.
 - Release signing certificate: saved RSA 3072-bit release key. SHA-256: `19025a51212f2bd0d86de0162a4ecec7c17dc22c31e7190aa845b48fb0bb13a7`. The debug APK uses the separate Android Debug key. The release key is also configured in encrypted GitHub Actions secrets.
 - Built APK label: My Trakt Wallpapers.
 - Built APK ID: `com.sww.projectivy.traktwallpapers`.
-- Version: 1.0.2 (versionCode 3). Minimum API 23; target API 36.
-- The published APK was downloaded, checked against its release checksum and saved signing certificate, and installed over the local build on the UGOOS. Its SHA-256 is `3d602b187c6f1a129758a48c4384e3d5294a50c080c0606fa721755f6b4ae982`.
+- Version: 1.0.3 (versionCode 4). Minimum API 23; target API 36.
+- Generation is bounded to 10 saved images and 20 metadata attempts per run. Images are rendered one at a time. The cache limit remains 60 wallpapers and 512 MiB.
 - Built APK authorities and settings alias use the new app ID. Android backup and cleartext traffic are disabled.
 - Generated BuildConfig contains public API URLs, not personal API keys, OAuth tokens, or a Trakt client secret.
 - Source archive excludes local.properties, build folders, .git, signing keys, and personal credentials. A source scan found no literal credential assignments.
@@ -47,6 +47,7 @@ The reused upstream revision is `4ade48e9f45de2bb2d2db1a5c35b087593ab2212` from 
 - Private Development app redirect defaults, exact saved HTTPS values, safe loopback validation, and the required Trakt credit.
 - QR login controls fit a 960 x 540 logical TV screen.
 - A native graphics test wrote a valid 3840 x 2160 JPEG with descriptions, rating, and a text title fallback. The rendered preview was also viewed locally.
+- A native batch test generated 10 durable 3840 x 2160 JPEGs from mixed movie/TV candidates. The next run added only the remaining two titles, and a third added none. The first 10 files and their cache records stayed unchanged. A separate test bounded missing-metadata attempts to 20 and checked that later jobs skip those failed titles.
 
 Unit tests use fixture data and a local mock API. Credential tests use an in-memory SecretStore. Real device login and persistence across an APK update have also been checked; a controlled reboot check remains.
 

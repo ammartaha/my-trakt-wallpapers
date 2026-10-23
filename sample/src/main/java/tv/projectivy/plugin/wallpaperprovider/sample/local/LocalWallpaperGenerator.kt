@@ -60,10 +60,10 @@ class LocalWallpaperGenerator(
             val missing = current.candidates.filter { mediaKey(it) !in cached && cache.failedUntil(mediaKey(it)) <= System.currentTimeMillis() }
                 .shuffled().sortedBy { mediaKey(it) in previousKeys }
             var rendered = 0
-            // At most three 4K images and six metadata attempts per job. Work never grows with list size.
-            for (candidate in missing.take(6)) {
+            // Bound each job, including attempts for titles without usable artwork.
+            for (candidate in missing.take(MAX_METADATA_ATTEMPTS_PER_RUN)) {
                 coroutineContext.ensureActive()
-                if (signature != SourceSelection.signature() || rendered >= 3) break
+                if (signature != SourceSelection.signature() || rendered >= MAX_WALLPAPERS_PER_RUN) break
                 val details = artwork.details(candidate)
                 if (details == null) {
                     cache.markUnavailable(mediaKey(candidate))
@@ -79,7 +79,7 @@ class LocalWallpaperGenerator(
                 val temp = File(output.parentFile, output.name + ".tmp")
                 try {
                     logo = details.logoUrl?.let { downloadBitmap(it, 1600) }
-                    PreferencesManager.syncStatus = "Creating wallpaper ${rendered + 1} of 3..."
+                    PreferencesManager.syncStatus = "Creating wallpaper ${rendered + 1} of $MAX_WALLPAPERS_PER_RUN..."
                     renderer.render(backdrop, logo, temp, details)
                     coroutineContext.ensureActive()
                     if (signature != SourceSelection.signature()) break
@@ -144,6 +144,9 @@ class LocalWallpaperGenerator(
     }
 
     companion object {
+        internal const val MAX_WALLPAPERS_PER_RUN = 10
+        private const val MAX_METADATA_ATTEMPTS_PER_RUN = 20
+
         fun interleave(movies: List<WallpaperCandidate>, shows: List<WallpaperCandidate>): List<WallpaperCandidate> =
             (0 until maxOf(movies.size, shows.size)).flatMap { listOfNotNull(movies.getOrNull(it), shows.getOrNull(it)) }
         fun randomizedCandidates(movies: List<WallpaperCandidate>, shows: List<WallpaperCandidate>, random: Random = Random.Default): List<WallpaperCandidate> =

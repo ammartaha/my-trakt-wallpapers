@@ -44,7 +44,7 @@ class SettingsFragment : GuidedStepSupportFragment(), SharedPreferences.OnShared
         add(MY_LISTS, "My lists", "Only checked lists are used. Movies and TV series are supported.", listActions(false))
         add(EXTRAS, "Extra catalogs (optional)", "Off unless you select them.", listActions(true))
         add(LOAD_POPULAR, "Load popular lists (optional)", "Load public list choices. This does not enable them.")
-        add(REFRESH, "Refresh now", "Check selected lists and create up to 3 wallpapers.")
+        add(REFRESH, "Refresh now", "Check selected lists and create up to ${LocalWallpaperGenerator.MAX_WALLPAPERS_PER_RUN} wallpapers.")
         add(INTERVAL, "Check interval", intervalTitle(PreferencesManager.syncMinutes),
             listOf(15, 60, 360).map { value -> GuidedAction.Builder(requireContext()).id(200L + value).title(intervalTitle(value))
                 .checkSetId(2).checked(PreferencesManager.syncMinutes == value).build() })
