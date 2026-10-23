@@ -30,8 +30,8 @@ android {
         applicationId = "com.sww.projectivy.traktwallpapers"
         minSdk = 23
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.0.2"
 
         buildConfigField("String", "TMDB_API_URL", "\"${prop("TMDB_API_URL", "https://api.themoviedb.org/3/")}\"")
         buildConfigField("String", "TRAKT_API_URL", "\"${prop("TRAKT_API_URL", "https://api.trakt.tv/")}\"")

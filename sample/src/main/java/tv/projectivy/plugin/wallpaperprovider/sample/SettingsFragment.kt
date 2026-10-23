@@ -286,7 +286,14 @@ class SettingsFragment : GuidedStepSupportFragment(), SharedPreferences.OnShared
     }
 
     private fun toast(message: String) { Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show() }
-    private fun reload() { val updated = mutableListOf<GuidedAction>(); onCreateActions(updated, null); setActions(updated) }
+    private fun reload() {
+        val updated = mutableListOf<GuidedAction>()
+        onCreateActions(updated, null)
+        // Every action is rebuilt. Leanback's default diff ignores new subActions and can leave
+        // a row bound to an old action that expandAction can no longer find in the adapter.
+        setActionsDiffCallback(null)
+        setActions(updated)
+    }
     private fun intervalTitle(value: Int) = when (value) { 15 -> "15 minutes"; 360 -> "6 hours"; else -> "1 hour" }
 
     companion object {

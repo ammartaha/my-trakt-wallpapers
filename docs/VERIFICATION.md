@@ -1,17 +1,17 @@
 # Build verification
 
-Checked on 22 October 2026. Times and dates for this project use Asia/Baghdad.
+Checked on 23 October 2026. Times and dates for this project use Asia/Baghdad.
 
 ## Result
 
 - Debug APK and minified release APK: built successfully.
-- Unit tests for 1.0.1: all 60 passed on GitHub Linux, zero failed or skipped. On Windows: 59 passed, zero failed, 1 platform-specific skip.
-- Android lint for 1.0.1: zero errors; 66 warnings on Windows and 68 on GitHub. The warnings cover unused resources, English UI text, compatibility hints, and dependency versions. They were not hidden with a baseline. GitHub also reports newer Android SDK and build tool versions.
+- Unit tests for 1.0.2 on Windows: 62 tests, 61 passed, zero failed, 1 platform-specific skip. The automatic GitHub run is recorded below after completion.
+- Android lint for 1.0.2: zero errors and 66 warnings on Windows. The warnings cover unused resources, English UI text, compatibility hints, and dependency versions. They were not hidden with a baseline.
 - APK signatures: both verify. The release APK has valid v1 and v2 signatures.
 - Release signing certificate: saved RSA 3072-bit release key. SHA-256: `19025a51212f2bd0d86de0162a4ecec7c17dc22c31e7190aa845b48fb0bb13a7`. The debug APK uses the separate Android Debug key. The release key is also configured in encrypted GitHub Actions secrets.
 - Built APK label: My Trakt Wallpapers.
 - Built APK ID: `com.sww.projectivy.traktwallpapers`.
-- Version: 1.0.1 (versionCode 2). Minimum API 23; target API 36.
+- Version: 1.0.2 (versionCode 3). Minimum API 23; target API 36.
 - Built APK authorities and settings alias use the new app ID. Android backup and cleartext traffic are disabled.
 - Generated BuildConfig contains public API URLs, not personal API keys, OAuth tokens, or a Trakt client secret.
 - Source archive excludes local.properties, build folders, .git, signing keys, and personal credentials. A source scan found no literal credential assignments.
@@ -42,11 +42,12 @@ The reused upstream revision is `4ade48e9f45de2bb2d2db1a5c35b087593ab2212` from 
 - Rate-limit delays and fallback backoff.
 - Normal cache reordering does not look like newly published data and cause a refresh loop.
 - TV settings and About dialogs, all sources off on first use, and the new Projectivy settings alias.
+- Settings reloads rebind Leanback menu rows. A regression reproduces the old stale-action failure, then verifies remote OK opens newly loaded list choices after reload. A second test verifies one OK press selects the watchlist, keeps it selected after reload, and a second press removes it.
 - Private Development app redirect defaults, exact saved HTTPS values, safe loopback validation, and the required Trakt credit.
 - QR login controls fit a 960 x 540 logical TV screen.
 - A native graphics test wrote a valid 3840 x 2160 JPEG with descriptions, rating, and a text title fallback. The rendered preview was also viewed locally.
 
-Unit tests use fixture data and a local mock API. Credential tests use an in-memory SecretStore; Android Keystore behavior still needs the device login and reboot check.
+Unit tests use fixture data and a local mock API. Credential tests use an in-memory SecretStore. Real device login and persistence across an APK update have also been checked; a controlled reboot check remains.
 
 Separate live account checks were completed after registration: the private Development app is approved; the Trakt device-code endpoint accepted its client ID and returned a code; and TMDB movie and TV artwork endpoints both returned HTTP 200 with backdrops and logos. No personal API values were placed in source, build settings, test fixtures, or GitHub. A copy for device setup is encrypted with Windows DPAPI in a private folder outside the repository.
 
@@ -56,7 +57,9 @@ Separate live account checks were completed after registration: the private Deve
 
 ## Checks which still need your TV
 
-No Android device was attached to ADB. No APK was installed on the UGOOS during this work.
+Version 1.0.2 was installed on an AM9 PRO running Android 14 / API 34. The original plugin 1.3.15 remains installed beside it. Projectivy Launcher 4.72 is installed. API settings and a real Trakt device login were saved on the TV and remained available after the signed APK update. The list and optional catalog menus open after a settings reload. Live list checks also run on the TV.
+
+The checks below still need a completed device test:
 
 1. Install beside the original plugin and open the settings from Projectivy.
 2. Enter your API details and finish a real Trakt device login.

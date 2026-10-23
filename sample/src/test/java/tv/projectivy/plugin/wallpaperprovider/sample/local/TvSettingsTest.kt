@@ -4,11 +4,16 @@ import android.app.Activity
 import android.app.AlertDialog
 import android.app.Application
 import android.os.Looper
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.TextView
 import androidx.leanback.widget.GuidedAction
+import androidx.leanback.widget.GuidedActionAdapter
+import androidx.leanback.widget.GuidedActionsStylist
+import androidx.work.Configuration
+import androidx.work.WorkManager
 import com.traktlistbackdrops.tv.R
 import org.junit.Assert.*
 import org.junit.Before
@@ -23,6 +28,7 @@ import org.robolectric.shadows.ShadowDialog
 import tv.projectivy.plugin.wallpaperprovider.sample.PreferencesManager
 import tv.projectivy.plugin.wallpaperprovider.sample.SettingsActivity
 import tv.projectivy.plugin.wallpaperprovider.sample.SettingsFragment
+import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28], application = Application::class, qualifiers = "w960dp-h540dp-land-mdpi")
@@ -45,6 +51,107 @@ class TvSettingsTest {
             assertTrue(sources.none { it.isChecked })
             assertTrue(SourceSelection.selected().isEmpty())
         } finally { controller.pause().stop().destroy() }
+    }
+
+    @Test fun myListsRebindsAfterReloadAndRemoteOpensNewListChoices() {
+        val controller = Robolectric.buildActivity(SettingsActivity::class.java).setup().visible()
+        try {
+            val activity = controller.get()
+            val fragment = activity.supportFragmentManager.fragments.filterIsInstance<SettingsFragment>().single()
+            val stylist = fragment.guidedActionsStylist
+            val grid = requireNotNull(stylist.actionsGridView)
+            val position = fragment.findActionPositionById(5L)
+            fragment.selectedActionPosition = position
+            activity.layoutSettings()
+            val oldRow = grid.findViewHolderForAdapterPosition(position) as GuidedActionsStylist.ViewHolder
+            val oldAction = requireNotNull(oldRow.action)
+            assertEquals(listOf("My watchlist"), oldAction.subActions!!.map { it.title.toString() })
+
+            // Returning from OAuth also reloads this same visible row. Its text stays unchanged.
+            PreferencesManager.personalListOptions = """[{"key":"personal_list:me:42","title":"New personal list","userId":"me","listId":"42","itemCount":2}]"""
+            controller.pause().resume()
+            activity.layoutSettings()
+
+            val row = grid.findViewHolderForAdapterPosition(position) as GuidedActionsStylist.ViewHolder
+            val boundAction = requireNotNull(row.action)
+            val adapter = grid.adapter as GuidedActionAdapter
+            assertNotSame(oldAction, fragment.actions[position])
+            assertSame("The bound row must use the current adapter action", adapter.getItem(position), boundAction)
+            assertEquals(position, adapter.indexOf(boundAction))
+            assertEquals(listOf("My watchlist", "New personal list"), boundAction.subActions!!.map { it.title.toString() })
+
+            row.itemView.requestFocus()
+            row.itemView.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER))
+            row.itemView.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_CENTER))
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+            activity.layoutSettings()
+            assertTrue("Remote OK must expand My lists after reload", stylist.isSubActionsExpanded)
+            val children = requireNotNull(stylist.subActionsGridView).adapter as GuidedActionAdapter
+            assertEquals(2, children.itemCount)
+            assertEquals("New personal list", children.getItem(1).title.toString())
+            assertTrue(SourceSelection.selected().isEmpty())
+        } finally { controller.pause().stop().destroy() }
+    }
+
+    @Test fun remoteTogglesWatchlistOnceAndKeepsChoiceAfterReload() {
+        // This test covers UI selection. Do not run wallpaper generation or background work.
+        WorkManager.initialize(RuntimeEnvironment.getApplication(), Configuration.Builder()
+            .setExecutor { }
+            .setTaskExecutor { }
+            .build())
+        val controller = Robolectric.buildActivity(SettingsActivity::class.java).setup().visible()
+        try {
+            val activity = controller.get()
+            val fragment = activity.supportFragmentManager.fragments.filterIsInstance<SettingsFragment>().single()
+            fun watchlistRow(): GuidedActionsStylist.ViewHolder {
+                val stylist = fragment.guidedActionsStylist
+                val position = fragment.findActionPositionById(5L)
+                fragment.selectedActionPosition = position
+                activity.layoutSettings()
+                val parent = requireNotNull(stylist.actionsGridView)
+                    .findViewHolderForAdapterPosition(position) as GuidedActionsStylist.ViewHolder
+                activity.pressRemoteOk(parent.itemView)
+                assertTrue(stylist.isSubActionsExpanded)
+                val children = requireNotNull(stylist.subActionsGridView)
+                val row = children.findViewHolderForAdapterPosition(0) as GuidedActionsStylist.ViewHolder
+                assertEquals("My watchlist", requireNotNull(row.action).title.toString())
+                return row
+            }
+
+            val unchecked = watchlistRow()
+            assertFalse(requireNotNull(unchecked.action).isChecked)
+            activity.pressRemoteOk(unchecked.itemView)
+            assertEquals("One OK press must select watchlist", setOf("watchlist"), SourceSelection.selected())
+
+            controller.pause().resume()
+            val checked = watchlistRow()
+            assertEquals(setOf("watchlist"), SourceSelection.selected())
+            assertTrue("Watchlist must stay checked after reload", requireNotNull(checked.action).isChecked)
+            activity.pressRemoteOk(checked.itemView)
+            assertTrue("One more OK press must remove watchlist", SourceSelection.selected().isEmpty())
+
+            controller.pause().resume()
+            assertFalse("Watchlist must stay unchecked after reload", requireNotNull(watchlistRow().action).isChecked)
+            assertTrue(SourceSelection.selected().isEmpty())
+        } finally { controller.pause().stop().destroy() }
+    }
+
+    private fun Activity.pressRemoteOk(view: View) {
+        view.requestFocus()
+        view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_CENTER))
+        view.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_CENTER))
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
+        layoutSettings()
+    }
+
+    private fun Activity.layoutSettings() {
+        shadowOf(Looper.getMainLooper()).idle()
+        window.decorView.apply {
+            requestLayout()
+            measure(View.MeasureSpec.makeMeasureSpec(960, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(540, View.MeasureSpec.EXACTLY))
+            layout(0, 0, 960, 540)
+        }
     }
 
     @Test fun apiAndCreditsDialogsOpenWithTheExistingLeanbackTheme() {
