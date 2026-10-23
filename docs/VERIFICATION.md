@@ -5,13 +5,14 @@ Checked on 23 October 2026. Times and dates for this project use Asia/Baghdad.
 ## Result
 
 - Debug APK and minified release APK: built successfully.
-- Unit tests for 1.0.2 on Windows: 62 tests, 61 passed, zero failed, 1 platform-specific skip. The automatic GitHub run is recorded below after completion.
-- Android lint for 1.0.2: zero errors and 66 warnings on Windows. The warnings cover unused resources, English UI text, compatibility hints, and dependency versions. They were not hidden with a baseline.
+- Unit tests for 1.0.2: all 62 passed on GitHub Linux, zero failed or skipped. On Windows: 61 passed, zero failed, 1 platform-specific skip.
+- Android lint for 1.0.2: zero errors; 66 warnings on Windows and 68 on GitHub. The warnings cover unused resources, English UI text, compatibility hints, and dependency versions. They were not hidden with a baseline.
 - APK signatures: both verify. The release APK has valid v1 and v2 signatures.
 - Release signing certificate: saved RSA 3072-bit release key. SHA-256: `19025a51212f2bd0d86de0162a4ecec7c17dc22c31e7190aa845b48fb0bb13a7`. The debug APK uses the separate Android Debug key. The release key is also configured in encrypted GitHub Actions secrets.
 - Built APK label: My Trakt Wallpapers.
 - Built APK ID: `com.sww.projectivy.traktwallpapers`.
 - Version: 1.0.2 (versionCode 3). Minimum API 23; target API 36.
+- The published APK was downloaded, checked against its release checksum and saved signing certificate, and installed over the local build on the UGOOS. Its SHA-256 is `3d602b187c6f1a129758a48c4384e3d5294a50c080c0606fa721755f6b4ae982`.
 - Built APK authorities and settings alias use the new app ID. Android backup and cleartext traffic are disabled.
 - Generated BuildConfig contains public API URLs, not personal API keys, OAuth tokens, or a Trakt client secret.
 - Source archive excludes local.properties, build folders, .git, signing keys, and personal credentials. A source scan found no literal credential assignments.
@@ -55,19 +56,26 @@ Separate live account checks were completed after registration: the private Deve
 
 `androidFileProviderSharesOnlyGeneratedFiles` passed on Linux GitHub Actions. It is skipped on Windows because AndroidX FileProvider's Android path check uses `/`, while the Windows JVM uses `\` paths. See [the AndroidX source](https://github.com/androidx/androidx/blob/androidx-main/core/core/src/main/java/androidx/core/content/FileProvider.java). The app still uses the standard FileProvider. The durable cache tests run on both systems.
 
-## Checks which still need your TV
+## UGOOS device checks
 
-Version 1.0.2 was installed on an AM9 PRO running Android 14 / API 34. The original plugin 1.3.15 remains installed beside it. Projectivy Launcher 4.72 is installed. API settings and a real Trakt device login were saved on the TV and remained available after the signed APK update. The list and optional catalog menus open after a settings reload. Live list checks also run on the TV.
+Version 1.0.2 was installed on an AM9 PRO running Android 14 / API 34. The original plugin 1.3.15 remains installed beside it. Projectivy Launcher 4.72 is installed.
+
+Confirmed on the device:
+
+- Real Trakt device login and API settings remain available after the signed APK update and a plugin process restart.
+- The list and optional catalog menus open after settings reloads. Selected sources remain selected after a plugin process restart.
+- Live Trakt checks load the selected movie catalog. Three wallpapers were generated and saved on the UGOOS.
+- Projectivy discovers the separate provider and reads its local FileProvider images with URI grants.
+- A generated movie wallpaper is visible on the real Projectivy home screen, with artwork, a movie logo, description, rating, year, runtime, genres, and tagline.
+- Saved wallpapers remain available after the plugin process is stopped and reopened. This is not a full TV reboot or offline test.
+- Android's JobScheduler has queued the plugin's next list check with timing and connectivity constraints. A full remote list-change cycle still needs the test below.
 
 The checks below still need a completed device test:
 
-1. Install beside the original plugin and open the settings from Projectivy.
-2. Enter your API details and finish a real Trakt device login.
-3. Choose a small private list with a movie and TV series. Check that only those titles appear.
-4. Add and remove titles. Use Refresh now, then check automatic refresh with the TV awake and online.
-5. Check artwork, logo, description, and ratings over your real Projectivy rows.
-6. Disconnect internet and reboot. Check saved wallpaper rotation with the same selection.
-7. Reconnect, reopen settings, and confirm the saved login and keys still work. Check sleep/wake behavior.
+1. Choose a private list with a movie and TV series. Check that only those titles appear when other sources are off. Fixture tests cover this behavior; a real populated private list was not available for the device check.
+2. Add and remove titles in Trakt, then wait for an automatic check while the TV is awake and online. Check that new titles appear and removed titles stop being offered.
+3. Disconnect internet and reboot. Check saved wallpaper rotation with the same selection.
+4. Reconnect and confirm the saved login and keys still work. Check sleep/wake behavior.
 
 The complete device checklist is in [SETUP.md](SETUP.md#device-checks).
 
@@ -82,6 +90,8 @@ Release signing secrets are configured. Pushes run checks and builds; version ta
 Those two earlier runs were started through `workflow_dispatch`. The owner-signed-in Actions page showed a separate one-time fork block, even though the repository API reported Actions enabled and the workflow active. Its **I understand my workflows, go ahead and enable them** button was enabled on 22 October. Both the [source push](https://github.com/ammartaha/my-trakt-wallpapers/actions/runs/39765066985) and the [1.0.1 tag push](https://github.com/ammartaha/my-trakt-wallpapers/actions/runs/39765139278) then started automatically with event `push`.
 
 [The automatic 1.0.1 release run](https://github.com/ammartaha/my-trakt-wallpapers/actions/runs/39765139278) passed all 60 tests, lint, both APK builds, and publication. [Version 1.0.1](https://github.com/ammartaha/my-trakt-wallpapers/releases/tag/v1.0.1) is published. The release APK SHA-256 is `3bacb28ba14f475600b0910c8973f552c9275d654e344f08b8b9cbd43fd4ef9e`.
+
+Both the [1.0.2 source push](https://github.com/ammartaha/my-trakt-wallpapers/actions/runs/39925045032) and [1.0.2 tag push](https://github.com/ammartaha/my-trakt-wallpapers/actions/runs/39925049887) started automatically and passed. The release run passed all 62 tests, lint, debug/release builds, signing, and publication. [Version 1.0.2](https://github.com/ammartaha/my-trakt-wallpapers/releases/tag/v1.0.2) fixes settings menus that stopped opening after a reload. The APK is signed with the same release certificate, so updates keep saved settings and wallpapers.
 
 ## Reports and preview
 
